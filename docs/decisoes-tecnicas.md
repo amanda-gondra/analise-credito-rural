@@ -54,9 +54,9 @@ Formato de cada registro: contexto, decisão, alternativas e justificativa. Hip�
 - **Alternativa:** delimitação oficial por municípios (agora possível, porque o arquivo tem `COD_MUNICIPIO_IBGE`).
 - **Justificativa:** mantém o MVP simples; a extensão municipal fica registrada como evolução.
 
-### D8 — Stack sem ferramentas extras
+### D8 — Stack sem ferramentas extras *(substituída pela D14 em 25/10/2026)*
 
-- **Decisão:** Python (requests, pandas, SQLAlchemy, psycopg, python-dotenv, pytest), PostgreSQL, Jupyter, Matplotlib.
+- **Decisão original:** Python (requests, pandas, SQLAlchemy, psycopg, python-dotenv, pytest), PostgreSQL, Jupyter, Matplotlib.
 
 ### D9 — Série principal: 2017–2025
 
@@ -86,6 +86,31 @@ Formato de cada registro: contexto, decisão, alternativas e justificativa. Hip�
 - **Fórmula:** `valor_real = valor_nominal × (IPCA_dez2025 / IPCA_mês)`.
 - **Série prevista:** IBGE/SIDRA tabela 1737, variável 2266 (número-índice). A confirmar na implementação.
 
+### D13 — O projeto é uma aplicação web pública
+
+- **Contexto:** a autora quer um produto que qualquer pessoa use, e não só um repositório para avaliação técnica.
+- **Decisão:** a entrega final é um site com back-end, front-end e banco de dados. O notebook deixa de ser a entrega principal.
+- **Funcionalidades:** visão geral do Brasil, página por estado, comparação entre estados, MATOPIBA, exploração com filtros e download em CSV, página sobre os dados.
+- **Detalhes:** [arquitetura-aplicacao.md](arquitetura-aplicacao.md).
+
+### D14 — Stack da aplicação *(substitui a D8)*
+
+- **Decisão:** pipeline e API em Python (FastAPI, Pydantic, SQLAlchemy Core, pytest); front-end em React + Vite + TypeScript; PostgreSQL 16; Docker Compose para o banco local; GitHub Actions para os testes.
+- **Alternativas:** API em Node.js + Fastify (stack já conhecida pela autora); front-end em Next.js.
+- **Justificativa:** uma única linguagem no back-end (pipeline e API); FastAPI valida as entradas e gera documentação OpenAPI; o front-end é estático e simples de publicar.
+
+### D15 — Publicação em serviços gratuitos
+
+- **Decisão:** banco no Neon, API no Render (web service gratuito), site no Vercel (Hobby).
+- **Alternativa descartada:** PostgreSQL gratuito do Render, que expira 30 dias após a criação.
+- **Consequência:** a API desliga após 15 min sem tráfego e leva cerca de 1 min para voltar; o site precisa mostrar um estado de carregamento claro.
+- **Verificado em:** 25/10/2026, nas páginas oficiais de cada serviço.
+
+### D16 — Separação de responsabilidades e acesso ao banco
+
+- **Decisão:** o pipeline é o único que escreve no banco (usuário `loader`); a API usa um usuário só com `SELECT` (`api_reader`); o site só conversa com a API.
+- **Justificativa:** uma falha ou ataque na API não consegue alterar os dados.
+
 ## Pendências
 
 | # | Pendência | Status | Impacto |
@@ -100,3 +125,5 @@ Formato de cada registro: contexto, decisão, alternativas e justificativa. Hip�
 | P8 | Causa da quebra de 2016 | Aberta | Só explicativo; o tratamento já está decidido (D9) |
 | P9 | Série e endereço do IPCA no SIDRA | Aberta | Necessária na fase de análise |
 | P10 | Último mês disponível em 2026 | Aberta | Só para análises parciais |
+| P11 | Tabela do IPCA no banco (estrutura e carga) | Aberta | Necessária para valores reais no site; entra no `schema.sql` na fase 4 |
+| P12 | Criação dos usuários `loader` e `api_reader` | Aberta | Script separado do `schema.sql`, na fase 3 |

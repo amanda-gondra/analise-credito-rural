@@ -78,7 +78,7 @@ Cada pergunta de negócio mapeada para métrica, campos, agregação, validaçã
 
 ## Pergunta 6 — Padrões no período
 
-Leitura conjunta das perguntas 1 a 5, no notebook e no README, separando fato observado de hipótese.
+Leitura conjunta das perguntas 1 a 5, no site (página "Sobre os dados") e no README, separando fato observado de hipótese.
 
 ## Visualizações previstas
 
@@ -92,11 +92,20 @@ Leitura conjunta das perguntas 1 a 5, no notebook e no README, separando fato ob
 
 Padrão visual: uma paleta, mesma cor para a mesma categoria em todos os gráficos, eixo começando em zero nas barras, e fonte, período e data de coleta em cada gráfico.
 
-## Sequência no notebook
+## Onde cada resultado aparece
 
-1. Inspeção e qualidade dos dados carregados.
-2. Estatística descritiva por ano, UF, atividade e finalidade.
-3. Perguntas 1 a 5, cada uma com pergunta, consulta, gráfico e interpretação.
-4. Principais achados e limitações.
+Desde 25/10/2026 a entrega é uma aplicação web ([arquitetura-aplicacao.md](arquitetura-aplicacao.md)). Cada pergunta segue o mesmo caminho:
 
-Os resultados vêm de `sql/queries.sql`. O notebook não recalcula em Pandas indicadores que já existem em SQL.
+```
+consulta em sql/queries.sql → rota da API → gráfico no site
+```
+
+| Pergunta | Rota da API | Página do site |
+| --- | --- | --- |
+| 1 | `/api/v1/brazil/yearly` | Visão geral |
+| 2 | `/api/v1/states/ranking` | Visão geral e página do estado |
+| 3 | `/api/v1/regions/matopiba/yearly` | MATOPIBA |
+| 4 | `/api/v1/brazil/yearly` | Visão geral |
+| 5 | `/api/v1/brazil/yearly` | Visão geral |
+
+A API não recalcula indicadores em Python: ela executa as consultas de `queries.sql`. Um teste automatizado compara as respostas da API com o resultado direto das consultas.

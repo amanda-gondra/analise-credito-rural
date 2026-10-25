@@ -91,7 +91,7 @@ Nenhum índice secundário. A chave primária já atende filtros por ano e mês,
 
 ## Correção monetária (planejada, não implementada)
 
-A tabela guarda apenas valores nominais. A versão real será calculada nas consultas ou no notebook, nunca gravada por cima dos valores originais.
+A tabela guarda apenas valores nominais. A versão real será calculada nas consultas (e servida pela API), nunca gravada por cima dos valores originais.
 
 - **Índice:** IPCA mensal, número-índice (base dez/1993 = 100), IBGE/SIDRA tabela 1737, variável 2266. **A confirmar** na implementação.
 - **Referência de preços:** dezembro de 2025.

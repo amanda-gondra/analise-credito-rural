@@ -2,7 +2,9 @@
 
 ## Objetivo
 
-Analisar como o crédito rural é distribuído no Brasil e como seu volume evolui ao longo do tempo, usando dados públicos do Banco Central, com um processo de coleta, armazenamento e análise reproduzível.
+Oferecer uma aplicação web pública em que qualquer pessoa consulte como o crédito rural é distribuído no Brasil e como seu volume evolui ao longo do tempo, com dados oficiais do Banco Central, coletados, validados e armazenados por um processo reproduzível.
+
+*Alterado em 25/10/2026: o projeto deixou de terminar num notebook e passou a ser uma aplicação com back-end, front-end e banco de dados. Arquitetura em [arquitetura-aplicacao.md](arquitetura-aplicacao.md).*
 
 ## Justificativa
 
@@ -10,8 +12,8 @@ O crédito rural é a principal forma de financiamento da produção agropecuár
 
 ## Público-alvo
 
-- **Recrutadores e avaliadores técnicos:** avaliam organização, SQL, qualidade dos dados e capacidade de explicar resultados.
-- **Leitores interessados em agronegócio:** querem as respostas, sem precisar ler código.
+- **Usuários do site:** produtores, consultores, técnicos, jornalistas, estudantes e analistas do setor que querem consultar os números sem ler código.
+- **Avaliadores técnicos:** veem no repositório a arquitetura, o SQL, a qualidade dos dados e os testes.
 
 ## Perguntas de negócio
 
@@ -45,26 +47,31 @@ Entra:
 1. Coleta automatizada dos arquivos anuais `MATRIZ_CR_REGIAO` do Banco Central.
 2. Preservação dos dados brutos com data de coleta.
 3. Tratamento, validação e carga no PostgreSQL.
-4. Arquivo `sql/queries.sql` respondendo às perguntas 1 a 5.
-5. Notebook com 5 gráficos e interpretação.
-6. Testes das regras de transformação e validação.
-7. README com instruções de execução e descobertas validadas.
+4. Arquivo `sql/queries.sql` respondendo às perguntas 1 a 5, com série do IPCA para valores reais.
+5. API somente leitura em FastAPI.
+6. Site em React com visão geral do Brasil, página por estado, comparação, MATOPIBA, exploração dos dados com download em CSV e página sobre os dados.
+7. Testes do pipeline, da API e do front-end, executados no GitHub Actions.
+8. Publicação gratuita: banco no Neon, API no Render, site no Vercel.
+9. README com instruções de execução, link do site e descobertas validadas.
 
 **Período da série principal:** 2017 a 2025, em ano civil. 2013–2016 têm quebras de classificação e de cobertura e ficam fora do comparativo principal; 2026 só aparece como dado parcial. Justificativa na D9 em [decisoes-tecnicas.md](decisoes-tecnicas.md).
 
 ## Exclusões
 
 - Microdados do Sicor (nível de operação).
-- Análises por município, produto, instituição financeira, gênero ou programa.
-- Dashboards interativos (Power BI, Streamlit).
-- Nuvem, orquestradores e agendamento automático.
+- Análises por município, produto, instituição financeira ou gênero. Programa entra apenas como filtro na exploração dos dados.
+- Login e contas de usuário: todos os dados são públicos.
+- Mapas coloridos por estado (depois da versão 1).
+- Orquestradores e atualização automática diária dos dados.
 - Modelos preditivos.
 - Indicadores de intensidade (crédito por produtor ou por área), que exigem bases externas.
 
 ## Critérios gerais de sucesso
 
-- Qualquer pessoa consegue reproduzir a análise seguindo o README.
+- O site está publicado e responde às cinco perguntas sem que o usuário precise ler código.
+- Qualquer pessoa consegue rodar o projeto inteiro localmente seguindo o README.
+- Os números do site são os mesmos de `queries.sql` (testado).
 - Os totais carregados batem exatamente com os arquivos coletados, e a diferença em relação às publicações oficiais está explicada.
-- Cada pergunta tem uma consulta SQL, um gráfico e uma interpretação.
+- Cada pergunta tem uma consulta SQL, uma rota da API e um gráfico no site.
 - As limitações (valores nominais, anos parciais, classificação de atividade) estão documentadas.
 - Nenhum número no README foi escrito à mão: todos vêm das consultas.
