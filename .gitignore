@@ -1,0 +1,13 @@
+# Downloaded source files and reference documents (re-downloadable, ~230 MB)
+data/
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+
+# Local credentials
+.env
+
+# Jupyter
+.ipynb_checkpoints/
