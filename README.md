@@ -1,4 +1,4 @@
-# Rural Credit Analysis
+# Análise de Crédito Rural
 
 Análise do crédito rural no Brasil com dados públicos do Banco Central: quanto é concedido, para onde vai e como mudou ao longo dos anos.
 
