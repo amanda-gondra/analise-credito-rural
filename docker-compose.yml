@@ -1,0 +1,27 @@
+# Local development database. Production uses Neon (see docs/arquitetura-aplicacao.md).
+# Credentials come from the .env file, which is never committed (see .env.example).
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: rural-credit-db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-rural_credit}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in the .env file}
+    ports:
+      # Bound to 127.0.0.1 so the database is reachable only from this computer.
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Runs once, on the first start with an empty volume.
+      - ./sql/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  pgdata:
