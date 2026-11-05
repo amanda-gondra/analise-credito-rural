@@ -9,8 +9,8 @@ Usage, from the project root (database running, .env filled in):
     python -m pipeline.load 2017 2025            # use files already downloaded
     python -m pipeline.load 2025 2025 --refresh  # download again before loading
 
-Connection: DATABASE_URL if set (production, e.g. Neon); otherwise built from
-the POSTGRES_* variables used by docker-compose.yml.
+Connection: DATABASE_URL if set (production, e.g. Neon); otherwise the local
+database of docker-compose.yml, as the loader role with LOADER_PASSWORD.
 """
 
 from __future__ import annotations
@@ -39,12 +39,13 @@ def get_engine() -> Engine:
     load_dotenv()
     url = os.environ.get("DATABASE_URL")
     if not url:
-        password = os.environ.get("POSTGRES_PASSWORD")
+        # The pipeline never uses the admin account: it connects as the loader role (sql/roles.sql).
+        password = os.environ.get("LOADER_PASSWORD")
         if not password:
-            raise RuntimeError("set DATABASE_URL or POSTGRES_PASSWORD (see .env.example)")
+            raise RuntimeError("set DATABASE_URL or LOADER_PASSWORD (see .env.example and sql/roles.sql)")
         url = URL.create(
             "postgresql+psycopg",
-            username=os.environ.get("POSTGRES_USER", "postgres"),
+            username="loader",
             password=password,
             # 127.0.0.1, not "localhost": on Windows "localhost" tries IPv6 (::1) first, and the
             # Docker port is published on IPv4 only, which delayed each connection by about 2 minutes.
