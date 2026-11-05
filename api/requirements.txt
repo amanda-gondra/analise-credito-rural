@@ -1,0 +1,8 @@
+# API dependencies only: this is what the server installs (no pandas, no test tools).
+# Exact versions so every machine, CI and the host install the same thing.
+fastapi==0.162.0
+uvicorn==0.54.0
+pydantic==2.14.3
+pydantic-settings==2.16.2
+SQLAlchemy==2.1.4
+psycopg[binary]==3.3.6

@@ -1,0 +1,5 @@
+# Development and CI only: the API plus the test client and the test runner.
+-r requirements.txt
+# httpx2: the HTTP client of Starlette's TestClient (the older "httpx" is deprecated there).
+httpx2==2.16.0
+pytest==9.1.1
