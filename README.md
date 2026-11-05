@@ -2,7 +2,7 @@
 
 Aplicação web para consultar o crédito rural no Brasil com dados oficiais do Banco Central: quanto é concedido, para onde vai e como mudou ao longo dos anos. Qualquer pessoa escolhe período, estado, atividade e finalidade e vê os números, os gráficos e a fonte.
 
-> **Status: Fase 3 concluída — pipeline funcionando.** Os dados de 2013 a 2025 são baixados do Banco Central, validados e carregados no PostgreSQL, com reconciliação até o centavo e testes automatizados. A API e o site ainda não foram implementados.
+> **Status: Fase 4 concluída — dados e consultas prontos.** Os dados de 2013 a 2025 são baixados do Banco Central, validados e carregados no PostgreSQL com reconciliação até o centavo; o IPCA do IBGE permite mostrar valores corrigidos; as 11 perguntas têm consultas SQL testadas contra o banco. A API, o assistente e o site ainda não foram implementados.
 
 ## O que o site vai oferecer
 
@@ -50,7 +50,7 @@ Arquivos do BCB → pipeline (Python) → PostgreSQL → API (FastAPI) → site 
 | --- | --- | --- |
 | Pipeline | Python, pandas, SQLAlchemy, pytest | **Pronto e testado** |
 | Banco | PostgreSQL 16 — `sql/schema.sql` | **Pronto e testado** |
-| Consultas | SQL — `sql/queries.sql` | Planejado (fase 4) |
+| Consultas | SQL — `sql/queries.sql` e a visão `credit_monthly_adjusted` | **Pronto e testado** |
 | API | FastAPI, Pydantic, SQLAlchemy Core | Planejado (fase 5) |
 | Assistente | Modelo de linguagem em plano gratuito (Gemini, com reservas) e ferramentas sobre a API | Planejado (fase 6) |
 | Site | React, Vite, TypeScript | Planejado (fase 7) |
@@ -67,7 +67,7 @@ Detalhes, rotas da API e segurança em [docs/arquitetura-aplicacao.md](docs/arqu
 | `pipeline/` | Coleta, validação e carga | Pronto e testado |
 | `sql/roles.sql` | Usuários do banco com permissões mínimas | Pronto e testado |
 | `tests/` | Testes automatizados (pytest) | Pronto |
-| `sql/queries.sql` | Consultas analíticas | Planejado |
+| `sql/queries.sql` | Uma consulta por pergunta, com valores nominais e corrigidos | Pronto e testado |
 | `api/` | API FastAPI | Planejado |
 | `web/` | Site React | Planejado |
 | `data/` | Arquivos baixados (fora do Git) | Local |
@@ -106,12 +106,14 @@ python -m venv .venv
 
 O pipeline baixa os arquivos anuais do Banco Central, valida, agrega por estado e grava cada ano numa única transação, conferindo os totais até o centavo. Os 13 anos levam cerca de 3 minutos. `pipeline.ipca` baixa do IBGE o índice de inflação usado para corrigir os valores (preços de dez/2025).
 
+O `pytest` roda os testes do pipeline e, com o banco no ar e carregado, também os testes das consultas (`tests/sql`), que conectam como `api_reader` e conferem se as partes somam o todo. Sem banco, esses testes aparecem como pulados, com o motivo.
+
 ## Plano de execução
 
 1. **Escopo e documentação** — concluída
 2. **Fonte, perfil dos dados e banco** — concluída
 3. **Pipeline** de coleta, validação e carga, com testes — concluída
-4. **Consultas SQL** e série do IPCA
+4. **Consultas SQL** e série do IPCA — concluída
 5. **API** FastAPI com testes
 6. **Assistente de IA** com ferramentas fechadas e avaliação
 7. **Site** React
