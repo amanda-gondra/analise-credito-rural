@@ -137,6 +137,12 @@ class SeasonalityFilters(PeriodFilters):
     purpose: Purpose | None = Field(default=None, description=_PURPOSE_DOC)
 
 
+class ProfileFilters(PeriodFilters):
+    """Question 7. In the route the UF comes in the path; the assistant passes it here."""
+
+    state: State = Field(description="UF (two letters).")
+
+
 class CompareFilters(PeriodFilters):
     """Question 6a."""
 

@@ -9,6 +9,7 @@ from fastapi import APIRouter, Path, Query
 from api.app.dependencies import DatabaseDep, envelope
 from api.app.filters import CompareFilters, PeriodFilters, SegmentFilters, State
 from api.app.schemas import Envelope, StateProfile, StateRank, StateYear
+from api.app.services import state_profile
 
 router = APIRouter(prefix="/api/v1/states", tags=["states"])
 
@@ -40,18 +41,9 @@ def compare_states(filters: Annotated[CompareFilters, Query()], database: Databa
         "Runs the same queries as the other routes, so every number matches them."
     ),
 )
-def state_profile(
+def get_state_profile(
     uf: Annotated[State, Path(description="UF (two letters).")],
     filters: Annotated[PeriodFilters, Query()],
     database: DatabaseDep,
 ) -> dict[str, Any]:
-    period = filters.query_params()
-    ranking = database.fetch("state_ranking", **period, activity_code=None, purpose=None)
-    profile = {
-        "state": uf,
-        "ranking": next((row for row in ranking if row["state_abbr"] == uf), None),
-        "yearly": database.fetch("yearly_totals", **period, state_abbr=uf, activity_code=None, purpose=None),
-        "activities": database.fetch("activity_split", **period, state_abbr=uf),
-        "purposes": database.fetch("purpose_split", **period, state_abbr=uf, activity_code=None),
-    }
-    return envelope(profile, filters, state=uf)
+    return envelope(state_profile(database, uf, filters), filters, state=uf)
