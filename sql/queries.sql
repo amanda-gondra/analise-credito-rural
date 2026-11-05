@@ -184,3 +184,199 @@ SELECT
     ROUND(100 * amount_nominal / NULLIF(SUM(amount_nominal) OVER (PARTITION BY reference_year), 0), 2) AS share_pct
 FROM complete
 ORDER BY reference_year, display_order;
+
+
+-- name: states_yearly
+-- Question 6a: how do selected states compare?
+-- Parameters: :first_year, :last_year, :state_abbrs (required; list of UFs, e.g. ['PI', 'CE']).
+-- One row per year and state, with the share of the national total of the same year.
+WITH national AS (
+    SELECT reference_year, SUM(credit_amount) AS amount_nominal
+    FROM credit_monthly_adjusted
+    WHERE reference_year BETWEEN :first_year AND :last_year
+    GROUP BY reference_year
+),
+by_state AS (
+    SELECT
+        reference_year,
+        state_abbr,
+        SUM(credit_amount)      AS amount_nominal,
+        SUM(credit_amount_real) AS amount_real,
+        SUM(contract_count)     AS contracts
+    FROM credit_monthly_adjusted
+    WHERE reference_year BETWEEN :first_year AND :last_year
+      AND state_abbr = ANY (CAST(:state_abbrs AS CHAR(2)[]))
+    GROUP BY reference_year, state_abbr
+)
+SELECT
+    b.reference_year,
+    b.state_abbr,
+    ROUND(b.amount_nominal, 2) AS amount_nominal,
+    ROUND(b.amount_real, 2)    AS amount_real,
+    b.contracts,
+    ROUND(100 * b.amount_nominal / NULLIF(n.amount_nominal, 0), 2) AS share_of_brazil_pct
+FROM by_state b
+JOIN national n USING (reference_year)
+ORDER BY b.reference_year, b.state_abbr;
+
+
+-- name: regions_yearly
+-- Question 6b: how do the five regions compare?
+-- Parameters: :first_year, :last_year (required); :activity_code, :purpose (optional).
+-- One row per year and region, with the share of that year's total.
+WITH by_region AS (
+    SELECT
+        reference_year,
+        region_name,
+        SUM(credit_amount)      AS amount_nominal,
+        SUM(credit_amount_real) AS amount_real,
+        SUM(contract_count)     AS contracts
+    FROM credit_monthly_adjusted
+    WHERE reference_year BETWEEN :first_year AND :last_year
+      AND (CAST(:activity_code AS CHAR(1)) IS NULL OR activity_code = CAST(:activity_code AS CHAR(1)))
+      AND (CAST(:purpose AS TEXT) IS NULL OR purpose = CAST(:purpose AS TEXT))
+    GROUP BY reference_year, region_name
+)
+SELECT
+    reference_year,
+    region_name,
+    ROUND(amount_nominal, 2) AS amount_nominal,
+    ROUND(amount_real, 2)    AS amount_real,
+    contracts,
+    ROUND(100 * amount_nominal / NULLIF(SUM(amount_nominal) OVER (PARTITION BY reference_year), 0), 2) AS share_pct
+FROM by_region
+ORDER BY reference_year, region_name;
+
+
+-- Question 7 (profile of a state) has no query of its own: it combines yearly_totals,
+-- state_ranking, activity_split and purpose_split for one UF, so every number of the
+-- profile is the same number shown in the other pages.
+
+
+-- name: program_ranking
+-- Question 8: which programs concentrate the credit?
+-- Parameters: :first_year, :last_year (required); :state_abbr (optional).
+-- One row per program, ordered by the real amount of the period. Names as published
+-- by the source; grouping the smaller ones into "Outros" is a presentation choice of the site.
+WITH by_program AS (
+    SELECT
+        program_name,
+        SUM(credit_amount)      AS amount_nominal,
+        SUM(credit_amount_real) AS amount_real,
+        SUM(contract_count)     AS contracts
+    FROM credit_monthly_adjusted
+    WHERE reference_year BETWEEN :first_year AND :last_year
+      AND (CAST(:state_abbr AS CHAR(2)) IS NULL OR state_abbr = CAST(:state_abbr AS CHAR(2)))
+    GROUP BY program_name
+)
+SELECT
+    RANK() OVER (ORDER BY amount_real DESC) AS position,
+    program_name,
+    ROUND(amount_nominal, 2) AS amount_nominal,
+    ROUND(amount_real, 2)    AS amount_real,
+    contracts,
+    ROUND(100 * amount_real / NULLIF(SUM(amount_real) OVER (), 0), 2) AS share_pct
+FROM by_program
+ORDER BY position, program_name;
+
+
+-- name: funding_source_ranking
+-- Question 9: where do the resources come from?
+-- Parameters: :first_year, :last_year (required); :state_abbr (optional).
+-- One row per funding source, ordered by the real amount of the period.
+WITH by_source AS (
+    SELECT
+        funding_source_name,
+        SUM(credit_amount)      AS amount_nominal,
+        SUM(credit_amount_real) AS amount_real,
+        SUM(contract_count)     AS contracts
+    FROM credit_monthly_adjusted
+    WHERE reference_year BETWEEN :first_year AND :last_year
+      AND (CAST(:state_abbr AS CHAR(2)) IS NULL OR state_abbr = CAST(:state_abbr AS CHAR(2)))
+    GROUP BY funding_source_name
+)
+SELECT
+    RANK() OVER (ORDER BY amount_real DESC) AS position,
+    funding_source_name,
+    ROUND(amount_nominal, 2) AS amount_nominal,
+    ROUND(amount_real, 2)    AS amount_real,
+    contracts,
+    ROUND(100 * amount_real / NULLIF(SUM(amount_real) OVER (), 0), 2) AS share_pct
+FROM by_source
+ORDER BY position, funding_source_name;
+
+
+-- name: seasonality
+-- Question 10: in which months of the year is the credit contracted?
+-- Parameters: :first_year, :last_year (required); :state_abbr, :purpose (optional).
+-- One row per calendar month: the share of that month in its year's total, averaged over
+-- the years (each year weighs the same, whatever its volume), plus the lowest and highest
+-- share seen. Months without credit count as 0%.
+WITH by_month AS (
+    SELECT reference_year, reference_month, SUM(credit_amount) AS amount_nominal
+    FROM credit_monthly_adjusted
+    WHERE reference_year BETWEEN :first_year AND :last_year
+      AND (CAST(:state_abbr AS CHAR(2)) IS NULL OR state_abbr = CAST(:state_abbr AS CHAR(2)))
+      AND (CAST(:purpose AS TEXT) IS NULL OR purpose = CAST(:purpose AS TEXT))
+    GROUP BY reference_year, reference_month
+),
+grid AS (
+    SELECT y.reference_year, m.reference_month
+    FROM (SELECT DISTINCT reference_year FROM by_month) y
+    CROSS JOIN generate_series(1, 12) AS m(reference_month)
+),
+shares AS (
+    SELECT
+        g.reference_year,
+        g.reference_month,
+        COALESCE(b.amount_nominal, 0)
+            / NULLIF(SUM(COALESCE(b.amount_nominal, 0)) OVER (PARTITION BY g.reference_year), 0) AS share
+    FROM grid g
+    LEFT JOIN by_month b USING (reference_year, reference_month)
+)
+SELECT
+    reference_month,
+    ROUND(100 * AVG(share), 2) AS avg_share_pct,
+    ROUND(100 * MIN(share), 2) AS min_share_pct,
+    ROUND(100 * MAX(share), 2) AS max_share_pct,
+    COUNT(*)                   AS years
+FROM shares
+GROUP BY reference_month
+ORDER BY reference_month;
+
+
+-- name: average_contract_value
+-- Question 11: what is the average value per contract?
+-- Parameters: :first_year, :last_year (required);
+--             :state_abbr, :region_name, :activity_code, :purpose, :program_name (optional).
+-- One row per year plus one row for the whole period (reference_year NULL).
+-- Average = SUM(amount) / SUM(contracts), never an average of averages. The period row
+-- uses real values, so years with different price levels can be added.
+WITH filtered AS (
+    SELECT reference_year, credit_amount, credit_amount_real, contract_count
+    FROM credit_monthly_adjusted
+    WHERE reference_year BETWEEN :first_year AND :last_year
+      AND (CAST(:state_abbr AS CHAR(2)) IS NULL OR state_abbr = CAST(:state_abbr AS CHAR(2)))
+      AND (CAST(:region_name AS TEXT) IS NULL OR region_name = CAST(:region_name AS TEXT))
+      AND (CAST(:activity_code AS CHAR(1)) IS NULL OR activity_code = CAST(:activity_code AS CHAR(1)))
+      AND (CAST(:purpose AS TEXT) IS NULL OR purpose = CAST(:purpose AS TEXT))
+      AND (CAST(:program_name AS TEXT) IS NULL OR program_name = CAST(:program_name AS TEXT))
+),
+totals AS (
+    SELECT
+        reference_year,
+        SUM(credit_amount)      AS amount_nominal,
+        SUM(credit_amount_real) AS amount_real,
+        SUM(contract_count)     AS contracts
+    FROM filtered
+    GROUP BY GROUPING SETS ((reference_year), ())
+)
+SELECT
+    reference_year,
+    ROUND(amount_nominal, 2) AS amount_nominal,
+    ROUND(amount_real, 2)    AS amount_real,
+    contracts,
+    ROUND(amount_nominal / NULLIF(contracts, 0), 2) AS average_nominal,
+    ROUND(amount_real / NULLIF(contracts, 0), 2)    AS average_real
+FROM totals
+ORDER BY reference_year NULLS LAST;
