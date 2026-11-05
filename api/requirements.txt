@@ -6,3 +6,6 @@ pydantic==2.14.3
 pydantic-settings==2.16.2
 SQLAlchemy==2.1.4
 psycopg[binary]==3.3.6
+# HTTP client of the assistant (calls to the language model providers).
+# httpx2 is the maintained continuation of httpx, published by the Pydantic team.
+httpx2==2.16.0

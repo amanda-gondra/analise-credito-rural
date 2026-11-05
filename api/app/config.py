@@ -13,6 +13,16 @@ Variables:
     RATE_LIMIT_PER_MINUTE   requests per client per minute to /api/v1/ (0: no limit)
     QUERIES_FILE            path of sql/queries.sql (default: the file of this repository)
     LOG_LEVEL               logging level
+
+Assistant (decision D18). Only providers with credentials are used, in this order:
+    ASSISTANT_PROVIDERS        order of the providers, e.g. "gemini,groq,cloudflare"
+    GEMINI_API_KEY / GEMINI_MODEL
+    GROQ_API_KEY / GROQ_MODEL
+    CLOUDFLARE_ACCOUNT_ID / CLOUDFLARE_API_TOKEN / CLOUDFLARE_MODEL
+    ASSISTANT_PER_MINUTE       questions per visitor per minute
+    ASSISTANT_PER_DAY          questions per visitor per day
+    ASSISTANT_GLOBAL_PER_DAY   questions per day for everybody (protects the free quotas)
+    ASSISTANT_TIMEOUT_SECONDS  time limit of each call to a provider
 """
 
 from __future__ import annotations
@@ -24,6 +34,8 @@ from typing import Annotated, Final, Literal
 from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 from sqlalchemy.engine import URL, make_url
+
+ProviderName = Literal["gemini", "groq", "cloudflare"]
 
 DEFAULT_QUERIES_FILE: Final = Path(__file__).resolve().parents[2] / "sql" / "queries.sql"
 # Hosts such as Neon give "postgresql://" URLs; SQLAlchemy needs the driver in the scheme.
@@ -46,7 +58,33 @@ class Settings(BaseSettings):
     queries_file: Path = DEFAULT_QUERIES_FILE
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
 
-    @field_validator("database_url_reader", "api_reader_password", mode="before")
+    # Assistant. Models are configurable because the free tiers change (checked 05/11/2026).
+    assistant_providers: Annotated[list[ProviderName], NoDecode] = Field(
+        default_factory=lambda: ["gemini", "groq", "cloudflare"]
+    )
+    gemini_api_key: SecretStr | None = None
+    gemini_model: str = "gemini-3.6-flash"
+    groq_api_key: SecretStr | None = None
+    groq_model: str = "llama-3.3-70b-versatile"
+    cloudflare_account_id: str | None = None
+    cloudflare_api_token: SecretStr | None = None
+    cloudflare_model: str = "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+    assistant_per_minute: int = Field(default=5, ge=1)
+    assistant_per_day: int = Field(default=30, ge=1)
+    assistant_global_per_day: int = Field(default=300, ge=1)
+    assistant_timeout_seconds: float = Field(default=20.0, gt=0, le=60)
+    # Questions are short; 4 KB covers 500 characters of any alphabet plus the JSON around them.
+    max_request_body_bytes: int = Field(default=4_096, ge=1_024)
+
+    @field_validator(
+        "database_url_reader",
+        "api_reader_password",
+        "gemini_api_key",
+        "groq_api_key",
+        "cloudflare_account_id",
+        "cloudflare_api_token",
+        mode="before",
+    )
     @classmethod
     def _empty_is_none(cls, value: object) -> object:
         # An empty variable in .env or on the host means "not set", not an empty password.
@@ -59,6 +97,13 @@ class Settings(BaseSettings):
             value = [origin.strip() for origin in value.split(",") if origin.strip()]
         if isinstance(value, list) and "*" in value:
             raise ValueError("ALLOWED_ORIGINS must list origins explicitly; '*' is not allowed")
+        return value
+
+    @field_validator("assistant_providers", mode="before")
+    @classmethod
+    def _split_providers(cls, value: object) -> object:
+        if isinstance(value, str):
+            value = [name.strip().lower() for name in value.split(",") if name.strip()]
         return value
 
     @model_validator(mode="after")
