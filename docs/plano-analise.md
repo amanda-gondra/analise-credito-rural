@@ -192,13 +192,18 @@ consulta em sql/queries.sql → rota da API → gráfico no site
                                          → ferramenta do assistente (D17)
 ```
 
-| Pergunta | Rota da API | Página do site |
-| --- | --- | --- |
-| 1 | `/api/v1/brazil/yearly` | Visão geral |
-| 2 | `/api/v1/states/ranking` | Visão geral e página do estado |
-| 3 | `/api/v1/regions/matopiba/yearly` | MATOPIBA |
-| 4 | `/api/v1/brazil/yearly` | Visão geral |
-| 5 | `/api/v1/brazil/yearly` | Visão geral |
-| 6 a 11 | Definidas na fase 5, junto com as ferramentas do assistente | Comparar estados, página do estado, explorar os dados |
+| Pergunta | Consulta | Rota da API (`GET`) | Página do site |
+| --- | --- | --- | --- |
+| 1 | `yearly_totals` | `/api/v1/totals/yearly` | Visão geral, página do estado |
+| 2 | `state_ranking` | `/api/v1/states/ranking` | Visão geral, página do estado |
+| 3 | `matopiba_yearly` | `/api/v1/regions/matopiba/yearly` | MATOPIBA |
+| 4 | `activity_split` | `/api/v1/activities/yearly` | Visão geral, página do estado |
+| 5 | `purpose_split` | `/api/v1/purposes/yearly` | Visão geral, página do estado |
+| 6 | `states_yearly`, `regions_yearly` | `/api/v1/states/compare`, `/api/v1/regions/yearly` | Comparar |
+| 7 | 1, 2, 4 e 5 para uma UF | `/api/v1/states/{uf}/profile` | Página do estado |
+| 8 | `program_ranking` | `/api/v1/programs/ranking` | Explorar os dados |
+| 9 | `funding_source_ranking` | `/api/v1/funding-sources/ranking` | Explorar os dados |
+| 10 | `seasonality` | `/api/v1/seasonality` | Visão geral |
+| 11 | `average_contract_value` | `/api/v1/contracts/average` | Explorar os dados |
 
-A API não recalcula indicadores em Python: ela executa as consultas de `queries.sql`. Um teste automatizado compara as respostas da API com o resultado direto das consultas. O assistente usa as mesmas rotas, então o número que ele responde é o mesmo que o painel mostra.
+A API não recalcula indicadores em Python: ela executa as consultas de `queries.sql` e só renomeia as colunas para nomes curtos (`reference_year` vira `year`, o código de atividade vira `agricultural` ou `livestock`). Os testes da API conferem que cada rota executa a consulta certa com os filtros certos e que as rotas concordam entre si no banco carregado (o perfil do estado repete os números do ranking e da série anual, as partes somam o total). O assistente usa as mesmas rotas, então o número que ele responde é o mesmo que o painel mostra.

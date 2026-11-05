@@ -2,7 +2,7 @@
 
 O projeto deixa de terminar num notebook e passa a ser uma aplicação web pública: qualquer pessoa entra no site, escolhe período, estado, atividade e finalidade e vê a análise do crédito rural com dados oficiais do Banco Central.
 
-**Status:** planejamento. Nada desta arquitetura foi implementado ainda, exceto o esquema do banco (`sql/schema.sql`).
+**Status:** pipeline, banco, consultas e API prontos e testados (fases 3 a 5). Assistente, site e publicação ainda não implementados.
 
 ## Para quem é
 
@@ -65,35 +65,55 @@ Cada camada tem uma responsabilidade: o pipeline é o único que escreve no banc
 
 SQLAlchemy Core em vez de ORM: as consultas são analíticas (agregações), e o SQL escrito à mão é parte do que o projeto quer mostrar.
 
-## API (versão 1, proposta)
+## API (versão 1)
 
-Todas as rotas são `GET`, públicas e somente leitura. Parâmetros comuns: `start_year`, `end_year`, `activity` (`agricultural` | `livestock`), `purpose` (`custeio` | `investimento` | `comercializacao` | `industrializacao`), `value` (`nominal` | `real`).
+Implementada em `api/` (fase 5). Todas as rotas são `GET`, públicas e somente leitura; cada uma executa uma consulta de `sql/queries.sql` como `api_reader`.
 
-| Rota | Retorna |
-| --- | --- |
-| `GET /api/v1/metadata` | Anos disponíveis, série principal, UFs, atividades, finalidades, programas e data de coleta |
-| `GET /api/v1/brazil/yearly` | Total por ano, variação anual, composição por finalidade e atividade |
-| `GET /api/v1/states/ranking` | Valor e participação por UF no período, com posição |
-| `GET /api/v1/states/{uf}/yearly` | Série anual de uma UF, composição e participação no Brasil |
-| `GET /api/v1/states/compare?states=MA,PI` | Séries anuais de 2 a 5 UFs |
-| `GET /api/v1/regions/matopiba/yearly` | Série da região e de cada estado, participação no Brasil |
-| `GET /api/v1/credit` | Linhas filtradas, paginadas (máximo 500 por página) |
-| `GET /api/v1/credit.csv` | Mesmo filtro, em CSV para download |
-| `GET /health` | Status da API e do banco |
+**Parâmetros**, todos opcionais, cada rota aceita só os que fazem sentido para ela:
 
-A documentação interativa fica em `/docs` (gerada pelo FastAPI).
+| Parâmetro | Valores | Padrão |
+| --- | --- | --- |
+| `start_year`, `end_year` | 2013 a 2025, com `start_year` ≤ `end_year` | 2017 e 2025 (série principal, D9) |
+| `state` | UF de duas letras (maiúscula ou minúscula) | Brasil inteiro |
+| `activity` | `agricultural`, `livestock` | as duas |
+| `purpose` | `custeio`, `investimento`, `comercializacao`, `industrializacao` | todas |
+| `region` | `norte`, `nordeste`, `sudeste`, `sul`, `centro-oeste` | todas |
+| `program` | nome exato, como listado em `/api/v1/metadata` | todos |
+
+Um parâmetro desconhecido ou fora da lista é recusado com 422, em vez de ser ignorado em silêncio. As respostas trazem os valores nominal e real juntos, por isso não há parâmetro para escolher entre eles.
+
+| Rota | Pergunta | Retorna |
+| --- | --- | --- |
+| `/api/v1/metadata` | — | Anos carregados com a data de coleta, série principal, valores aceitos em cada filtro, programas e último mês do IPCA |
+| `/api/v1/totals/yearly` | 1 | Total por ano, contratos e variação anual (`state`, `activity`, `purpose`) |
+| `/api/v1/states/ranking` | 2 | Posição, valor e participação de cada UF no período (`activity`, `purpose`) |
+| `/api/v1/regions/matopiba/yearly` | 3 | Cada estado do MATOPIBA e o bloco, com participação no Brasil |
+| `/api/v1/activities/yearly` | 4 | Agricultura e pecuária por ano (`state`) |
+| `/api/v1/purposes/yearly` | 5 | As quatro finalidades por ano (`state`, `activity`) |
+| `/api/v1/states/compare?states=PI,CE` | 6 | Séries anuais de 2 a 5 UFs, com participação no Brasil |
+| `/api/v1/regions/yearly` | 6 | As cinco regiões por ano (`activity`, `purpose`) |
+| `/api/v1/states/{uf}/profile` | 7 | Posição no ranking, série anual, atividades e finalidades de uma UF |
+| `/api/v1/programs/ranking` | 8 | Programas ordenados pelo valor do período (`state`) |
+| `/api/v1/funding-sources/ranking` | 9 | Fontes de recursos ordenadas pelo valor do período (`state`) |
+| `/api/v1/seasonality` | 10 | Participação média, mínima e máxima de cada mês no ano (`state`, `purpose`) |
+| `/api/v1/contracts/average` | 11 | Valor médio por contrato, por ano e no período (`state` ou `region`, `activity`, `purpose`, `program`) |
+| `/health` | — | Status da API e do banco (503 se o banco não responde) |
+
+Toda rota de dados responde `{"data", "meta"}`. `meta` traz a fonte, o índice de preços (IPCA, preços de dez/2025) e os filtros aplicados, para que o site e o assistente citem o número com período e fonte (D17). A documentação interativa fica em `/docs` (gerada pelo FastAPI).
+
+A tabela paginada e o download em CSV da página "Explorar dados" (`/api/v1/credit` e `/api/v1/credit.csv`) ficam para a fase 7, junto com a página que os usa.
 
 ## Segurança
 
 | Risco | Controle |
 | --- | --- |
-| Injeção de SQL | Parâmetros sempre vinculados pelo driver; nenhuma concatenação de entrada do usuário |
-| Escrita indevida no banco | A API usa um usuário só com `SELECT` no schema `rural_credit` |
-| Entrada inválida | Pydantic valida tipos, intervalos (anos dentro do disponível) e listas fechadas (UF, atividade, finalidade) |
-| Consultas caras e abuso | Paginação obrigatória, limite de linhas no CSV, limite de requisições por IP |
-| Acesso de outros sites | CORS restrito ao domínio do front-end |
-| Credenciais | Variáveis de ambiente; `.env` fora do Git; `.env.example` com valores fictícios |
-| Erros expostos | Mensagens genéricas para o usuário; detalhes só nos logs |
+| Injeção de SQL | A API não tem SQL próprio: executa as consultas nomeadas de `queries.sql`, com parâmetros vinculados pelo driver; nenhuma concatenação de entrada do usuário |
+| Escrita indevida no banco | A API usa `api_reader`: só `SELECT`, transações somente leitura por padrão |
+| Entrada inválida | Pydantic valida tipos, intervalos (anos carregados) e listas fechadas (UF, atividade, finalidade, região); parâmetro desconhecido é recusado |
+| Consultas caras e abuso | Limite de requisições por cliente às rotas `/api/v1/` (429 com `Retry-After`); tempo máximo de 5 s por consulta e no máximo 10 conexões do `api_reader`; pool de conexões limitado |
+| Acesso de outros sites | CORS fechado por padrão, aberto só às origens listadas em `ALLOWED_ORIGINS` (`*` é recusado), só `GET` |
+| Credenciais | Variáveis de ambiente; `.env` fora do Git; `.env.example` com valores fictícios; a API lê só a senha do `api_reader` |
+| Erros expostos | Formato único de erro com `request_id`; mensagens genéricas, sem SQL nem dados de conexão; detalhes só nos logs, que não registram os parâmetros da requisição |
 
 Não há login: todos os dados são públicos.
 
@@ -102,10 +122,9 @@ Não há login: todos os dados são públicos.
 ```
 analise-credito-rural/
 ├── pipeline/                 # coleta, validação e carga (Python)
-│   ├── rural_credit_pipeline/
-│   └── tests/
+├── tests/                    # testes do pipeline (pipeline/) e das consultas (sql/)
 ├── api/                      # API (FastAPI)
-│   ├── app/
+│   ├── app/                  # configuração, banco, filtros, respostas, rotas e middlewares
 │   └── tests/
 ├── web/                      # site (React + Vite + TypeScript)
 │   └── src/
@@ -138,7 +157,7 @@ O PostgreSQL gratuito do Render foi descartado: expira 30 dias após a criação
 | 4 | `queries.sql`: uma consulta por pergunta, com reconciliação; série do IPCA no banco | 3 |
 | 5 | API FastAPI com as rotas acima + testes | 4 |
 | 6 | Assistente de IA: ferramentas sobre as rotas da API, troca de provedor, limites e conjunto de avaliação (D17, D18) | 5 |
-| 7 | Front-end React com as seis páginas e o assistente | 6 |
+| 7 | Front-end React com as seis páginas e o assistente; rotas da página "Explorar dados" (`/api/v1/credit` e CSV) | 6 |
 | 8 | Publicação (Neon, Render, Vercel) e CI no GitHub Actions | 7 |
 
 Cada fase é feita um arquivo por vez, com explicação de cada parte.

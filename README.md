@@ -2,7 +2,7 @@
 
 Aplicação web para consultar o crédito rural no Brasil com dados oficiais do Banco Central: quanto é concedido, para onde vai e como mudou ao longo dos anos. Qualquer pessoa escolhe período, estado, atividade e finalidade e vê os números, os gráficos e a fonte.
 
-> **Status: Fase 4 concluída — dados e consultas prontos.** Os dados de 2013 a 2025 são baixados do Banco Central, validados e carregados no PostgreSQL com reconciliação até o centavo; o IPCA do IBGE permite mostrar valores corrigidos; as 11 perguntas têm consultas SQL testadas contra o banco. A API, o assistente e o site ainda não foram implementados.
+> **Status: Fase 5 concluída — API pronta.** Os dados de 2013 a 2025 são baixados do Banco Central, validados e carregados no PostgreSQL com reconciliação até o centavo; o IPCA do IBGE permite mostrar valores corrigidos; as 11 perguntas têm consultas SQL testadas contra o banco e uma API somente leitura que as publica. O assistente e o site ainda não foram implementados.
 
 ## O que o site vai oferecer
 
@@ -51,7 +51,7 @@ Arquivos do BCB → pipeline (Python) → PostgreSQL → API (FastAPI) → site 
 | Pipeline | Python, pandas, SQLAlchemy, pytest | **Pronto e testado** |
 | Banco | PostgreSQL 16 — `sql/schema.sql` | **Pronto e testado** |
 | Consultas | SQL — `sql/queries.sql` e a visão `credit_monthly_adjusted` | **Pronto e testado** |
-| API | FastAPI, Pydantic, SQLAlchemy Core | Planejado (fase 5) |
+| API | FastAPI, Pydantic, SQLAlchemy Core — `api/` | **Pronto e testado** |
 | Assistente | Modelo de linguagem em plano gratuito (Gemini, com reservas) e ferramentas sobre a API | Planejado (fase 6) |
 | Site | React, Vite, TypeScript | Planejado (fase 7) |
 | Publicação | Neon (banco), Render (API), Vercel (site), GitHub Actions | Planejado (fase 8) |
@@ -68,7 +68,7 @@ Detalhes, rotas da API e segurança em [docs/arquitetura-aplicacao.md](docs/arqu
 | `sql/roles.sql` | Usuários do banco com permissões mínimas | Pronto e testado |
 | `tests/` | Testes automatizados (pytest) | Pronto |
 | `sql/queries.sql` | Uma consulta por pergunta, com valores nominais e corrigidos | Pronto e testado |
-| `api/` | API FastAPI | Planejado |
+| `api/` | API FastAPI somente leitura, com testes em `api/tests` | Pronto e testado |
 | `web/` | Site React | Planejado |
 | `data/` | Arquivos baixados (fora do Git) | Local |
 
@@ -108,13 +108,24 @@ O pipeline baixa os arquivos anuais do Banco Central, valida, agrega por estado 
 
 O `pytest` roda os testes do pipeline e, com o banco no ar e carregado, também os testes das consultas (`tests/sql`), que conectam como `api_reader` e conferem se as partes somam o todo. Sem banco, esses testes aparecem como pulados, com o motivo.
 
+### 4. API
+
+```powershell
+.venv\Scripts\python -m pip install -r api\requirements-dev.txt
+.venv\Scripts\python -m uvicorn api.app.main:create_app --factory --port 8000
+```
+
+A documentação interativa fica em http://127.0.0.1:8000/docs. A API conecta como `api_reader` (senha do `.env`), só lê, aceita apenas `GET` e limita a 60 pedidos por minuto por cliente. Exemplo: http://127.0.0.1:8000/api/v1/states/PI/profile mostra o perfil do Piauí de 2017 a 2025.
+
+O `pytest` passa a rodar também os testes da API (`api/tests`): validação dos filtros, formato dos erros, CORS e limite de pedidos sem banco; e, com o banco carregado, se as rotas concordam entre si.
+
 ## Plano de execução
 
 1. **Escopo e documentação** — concluída
 2. **Fonte, perfil dos dados e banco** — concluída
 3. **Pipeline** de coleta, validação e carga, com testes — concluída
 4. **Consultas SQL** e série do IPCA — concluída
-5. **API** FastAPI com testes
+5. **API** FastAPI com testes — concluída
 6. **Assistente de IA** com ferramentas fechadas e avaliação
 7. **Site** React
 8. **Publicação** e integração contínua
