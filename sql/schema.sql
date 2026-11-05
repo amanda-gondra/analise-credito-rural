@@ -214,3 +214,37 @@ COMMENT ON COLUMN ipca_monthly.index_value IS
     'Index number as published by IBGE, two decimals (December 1993 = 100).';
 COMMENT ON COLUMN ipca_monthly.collected_at IS
     'When the series was downloaded from SIDRA.';
+
+-- -----------------------------------------------------------------------------
+-- Analytical view: facts with region and inflation-adjusted amount
+-- -----------------------------------------------------------------------------
+
+-- Every query in sql/queries.sql reads this view, so the adjustment is written once.
+-- LEFT JOIN on the index: a month without IPCA keeps its nominal amount and gets a NULL
+-- real amount, instead of silently disappearing from the totals.
+CREATE OR REPLACE VIEW credit_monthly_adjusted AS
+SELECT
+    c.reference_year,
+    c.reference_month,
+    c.state_abbr,
+    s.region_name,
+    c.activity_code,
+    c.program_name,
+    c.subprogram_name,
+    c.funding_source_name,
+    c.purpose,
+    c.contract_count,
+    c.credit_amount,
+    c.credit_amount * reference_index.index_value / month_index.index_value AS credit_amount_real
+FROM credit_monthly c
+JOIN ref_state s ON s.state_abbr = c.state_abbr
+LEFT JOIN ipca_monthly month_index
+       ON month_index.reference_year = c.reference_year
+      AND month_index.reference_month = c.reference_month
+LEFT JOIN ipca_monthly reference_index
+       ON reference_index.reference_year = 2025
+      AND reference_index.reference_month = 12;
+
+COMMENT ON VIEW credit_monthly_adjusted IS
+    'credit_monthly plus the region of the UF and credit_amount_real: the amount at December 2025 prices '
+    '(decision D12), computed month by month and never stored. Full precision; round only the final result.';
