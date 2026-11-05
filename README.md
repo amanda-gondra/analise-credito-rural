@@ -100,10 +100,11 @@ Cria `loader`, que o pipeline usa para gravar, e `api_reader`, que a API usa só
 python -m venv .venv
 .venv\Scripts\python -m pip install -r pipeline\requirements-dev.txt
 .venv\Scripts\python -m pipeline.load 2013 2025
+.venv\Scripts\python -m pipeline.ipca
 .venv\Scripts\python -m pytest
 ```
 
-O pipeline baixa os arquivos anuais do Banco Central, valida, agrega por estado e grava cada ano numa única transação, conferindo os totais até o centavo. Os 13 anos levam cerca de 3 minutos.
+O pipeline baixa os arquivos anuais do Banco Central, valida, agrega por estado e grava cada ano numa única transação, conferindo os totais até o centavo. Os 13 anos levam cerca de 3 minutos. `pipeline.ipca` baixa do IBGE o índice de inflação usado para corrigir os valores (preços de dez/2025).
 
 ## Plano de execução
 

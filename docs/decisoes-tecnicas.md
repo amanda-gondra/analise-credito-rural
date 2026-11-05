@@ -84,7 +84,7 @@ Formato de cada registro: contexto, decisão, alternativas e justificativa. Hip�
 
 - **Decisão:** preservar os valores nominais na base. A análise real usará o IPCA mensal do IBGE, com cada mês corrigido para preços de dez/2025 antes da soma anual.
 - **Fórmula:** `valor_real = valor_nominal × (IPCA_dez2025 / IPCA_mês)`.
-- **Série prevista:** IBGE/SIDRA tabela 1737, variável 2266 (número-índice). A confirmar na implementação.
+- **Série:** IBGE/SIDRA tabela 1737, variável 2266 (número-índice, base dez/1993 = 100), confirmada em 05/11/2026; tabela `ipca_monthly`, carga em `pipeline/ipca.py`.
 
 ### D13 — O projeto é uma aplicação web pública
 
@@ -145,7 +145,7 @@ Formato de cada registro: contexto, decisão, alternativas e justificativa. Hip�
 | P6 | Revisão retroativa dos dados | **Confirmada:** a base é revisada diariamente; tratada com SHA-256 e data de coleta | — |
 | P7 | Referência oficial para reconciliação | **Resolvida:** tabela BCB/DSTAT no Anuário IBGE (2023, 2024) e Boletim Derop | — |
 | P8 | Causa da quebra de 2016 | Aberta | Só explicativo; o tratamento já está decidido (D9) |
-| P9 | Série e endereço do IPCA no SIDRA | Aberta | Necessária na fase de análise |
+| P9 | Série e endereço do IPCA no SIDRA | **Resolvida:** tabela 1737, variável 2266 (D12) | — |
 | P10 | Último mês disponível em 2026 | Aberta | Só para análises parciais |
-| P11 | Tabela do IPCA no banco (estrutura e carga) | Aberta | Necessária para valores reais no site; entra no `schema.sql` na fase 4 |
+| P11 | Tabela do IPCA no banco (estrutura e carga) | **Resolvida:** `ipca_monthly` no `schema.sql` e `pipeline/ipca.py` (fase 4) | — |
 | P12 | Criação dos usuários `loader` e `api_reader` | **Resolvida:** `sql/roles.sql` (fase 3) | — |

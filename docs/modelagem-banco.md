@@ -89,11 +89,11 @@ Nenhum índice secundário. A chave primária já atende filtros por ano e mês,
 4. Em uma única transação: apagar fatos e `source_file` do mesmo ano (se existirem), inserir `source_file`, inserir os fatos.
 5. Reconciliar em SQL: soma do fato = `source_total_amount` e `source_total_qty`.
 
-## Correção monetária (planejada, não implementada)
+## Correção monetária
 
-A tabela guarda apenas valores nominais. A versão real será calculada nas consultas (e servida pela API), nunca gravada por cima dos valores originais.
+A tabela `credit_monthly` guarda apenas valores nominais. A versão real é calculada nas consultas (e servida pela API), nunca gravada por cima dos valores originais.
 
-- **Índice:** IPCA mensal, número-índice (base dez/1993 = 100), IBGE/SIDRA tabela 1737, variável 2266. **A confirmar** na implementação.
+- **Índice:** IPCA mensal, número-índice (base dez/1993 = 100), IBGE/SIDRA tabela 1737, variável 2266, confirmado em 05/11/2026 nos metadados da tabela. Fica na tabela `ipca_monthly` (de jan/2013 ao último mês publicado), carregada por `pipeline/ipca.py`, que troca a série inteira numa transação e rejeita meses faltando, valores ausentes ou série que termine antes da referência.
 - **Referência de preços:** dezembro de 2025.
 - **Fórmula, por mês:** `valor_real = valor_nominal × (IPCA_dez2025 / IPCA_mês_de_emissão)`
 - **Agregação:** corrigir cada mês antes de somar o ano.
