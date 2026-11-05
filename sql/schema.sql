@@ -192,3 +192,25 @@ COMMENT ON COLUMN credit_monthly.credit_amount IS
 
 -- No secondary indexes on purpose: 2013–2025 is about 235 thousand rows, small
 -- enough for sequential scans. Revisit with EXPLAIN ANALYZE once queries.sql exists.
+
+-- -----------------------------------------------------------------------------
+-- Price index for inflation adjustment (decision D12)
+-- -----------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS ipca_monthly (
+    reference_year   SMALLINT        NOT NULL CHECK (reference_year BETWEEN 1993 AND 2100),
+    reference_month  SMALLINT        NOT NULL CHECK (reference_month BETWEEN 1 AND 12),
+    index_value      NUMERIC(10, 2)  NOT NULL CHECK (index_value > 0),
+    collected_at     TIMESTAMPTZ     NOT NULL,
+    PRIMARY KEY (reference_year, reference_month)
+);
+
+COMMENT ON TABLE ipca_monthly IS
+    'IPCA price index (IBGE), one row per month. Source: SIDRA table 1737, variable 2266, '
+    '"IPCA - Número-índice (base: dezembro de 1993 = 100)". Loaded by pipeline/ipca.py, which replaces '
+    'the whole table in a single transaction. Real values are computed in the queries, never stored: '
+    'real = nominal × (index of the reference month / index of the month of issue).';
+COMMENT ON COLUMN ipca_monthly.index_value IS
+    'Index number as published by IBGE, two decimals (December 1993 = 100).';
+COMMENT ON COLUMN ipca_monthly.collected_at IS
+    'When the series was downloaded from SIDRA.';

@@ -23,6 +23,12 @@
     DO $$ BEGIN RAISE EXCEPTION 'missing psql variable: -v api_reader_password=...'; END $$;
 \endif
 
+-- An empty variable would clear the password instead of setting one, so require a strong value.
+SELECT length(:'loader_password') < 16 OR length(:'api_reader_password') < 16 AS weak_password \gset
+\if :weak_password
+    DO $$ BEGIN RAISE EXCEPTION 'loader_password and api_reader_password must have at least 16 characters'; END $$;
+\endif
+
 -- Create the roles only if they do not exist yet (CREATE ROLE has no IF NOT EXISTS).
 SELECT format('CREATE ROLE loader LOGIN PASSWORD %L', :'loader_password')
 WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'loader')
@@ -52,9 +58,9 @@ REVOKE ALL ON ALL TABLES IN SCHEMA rural_credit FROM PUBLIC;
 GRANT CONNECT ON DATABASE :"DBNAME" TO loader, api_reader;
 GRANT USAGE ON SCHEMA rural_credit TO loader, api_reader;
 
--- loader: read the reference tables, replace the data of a year.
+-- loader: read the reference tables, replace the data of a year and the IPCA series.
 GRANT SELECT ON rural_credit.ref_state, rural_credit.ref_activity, rural_credit.ref_purpose TO loader;
-GRANT SELECT, INSERT, DELETE ON rural_credit.source_file, rural_credit.credit_monthly TO loader;
+GRANT SELECT, INSERT, DELETE ON rural_credit.source_file, rural_credit.credit_monthly, rural_credit.ipca_monthly TO loader;
 GRANT USAGE ON ALL SEQUENCES IN SCHEMA rural_credit TO loader;  -- source_file_id identity
 
 -- api_reader: read everything in the schema, including tables created later by the owner.
