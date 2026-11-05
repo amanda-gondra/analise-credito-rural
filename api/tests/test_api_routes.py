@@ -147,16 +147,19 @@ def test_health_reports_the_database(client):
     assert response.json() == {"status": "ok", "database": "ok"}
 
 
-def test_openapi_documents_every_route_as_get_only(client):
+def test_openapi_documents_every_route_and_only_the_assistant_accepts_post(client):
     paths = client.get("/openapi.json").json()["paths"]
 
     assert set(paths) == {
         "/api/v1/metadata", "/api/v1/totals/yearly", "/api/v1/seasonality", "/api/v1/contracts/average",
         "/api/v1/states/ranking", "/api/v1/states/compare", "/api/v1/states/{uf}/profile",
         "/api/v1/regions/yearly", "/api/v1/regions/matopiba/yearly", "/api/v1/activities/yearly",
-        "/api/v1/purposes/yearly", "/api/v1/programs/ranking", "/api/v1/funding-sources/ranking", "/health",
+        "/api/v1/purposes/yearly", "/api/v1/programs/ranking", "/api/v1/funding-sources/ranking",
+        "/api/v1/assistant/ask", "/health",
     }
-    assert all(set(methods) == {"get"} for methods in paths.values())
+    methods = {path: set(operations) for path, operations in paths.items()}
+    assert methods.pop("/api/v1/assistant/ask") == {"post"}
+    assert all(operations == {"get"} for operations in methods.values())
 
 
 def test_root_redirects_to_the_documentation(client):
