@@ -76,9 +76,100 @@ Cada pergunta de negócio mapeada para métrica, campos, agregação, validaçã
 | Validação | Soma das 4 finalidades = total da pergunta 1 |
 | Gráfico | Barras empilhadas por ano com as quatro finalidades |
 
-## Pergunta 6 — Padrões no período
+## Pergunta 6 — Comparação entre estados e regiões
 
-Leitura conjunta das perguntas 1 a 5, no site (página "Sobre os dados") e no README, separando fato observado de hipótese.
+| Item | Definição |
+| --- | --- |
+| Métrica | Valor e contratos por UF ou por região, por ano; participação de cada um no total nacional |
+| Campos | `state_abbr`, `ref_state.region_name`, `reference_year`, `credit_amount`, `contract_count` |
+| Filtros | UFs ou regiões escolhidas; série principal |
+| Agregação | `SUM` por ano e UF (ou região) |
+| Denominador | Total nacional do mesmo ano |
+| Riscos | Comparar volumes absolutos de estados de tamanhos muito diferentes sem mostrar a participação |
+| Validação | Soma das UFs de uma região = valor da região; soma das 5 regiões = total nacional |
+| Gráfico | Linhas por UF ou região, mesmo eixo |
+
+## Pergunta 7 — Perfil de um estado
+
+| Item | Definição |
+| --- | --- |
+| Métrica | Para uma UF: valor por ano, participação no Brasil, posição no ranking, divisão por atividade e por finalidade |
+| Campos | Os das perguntas 1, 2, 4 e 5 |
+| Filtros | `state_abbr = :uf`; série principal |
+| Agregação | As consultas 1, 2, 4 e 5 filtradas pela UF; não há cálculo novo |
+| Denominador | Os das perguntas de origem |
+| Riscos | Resumo com números de períodos diferentes |
+| Validação | Cada parte bate com a pergunta de origem filtrada pela mesma UF |
+| Gráfico | Página do estado no site |
+
+## Pergunta 8 — Programas
+
+| Item | Definição |
+| --- | --- |
+| Métrica | Valor e contratos por programa e ano; participação no total |
+| Campos | `program_name`, `reference_year`, `credit_amount`, `contract_count` |
+| Filtros | Série principal; UF opcional |
+| Agregação | `SUM` por ano e programa; ranking dos programas |
+| Denominador | Total do mesmo recorte |
+| Riscos | Antes de 2015 quase tudo é "NÃO INFORMADO" (fora da série principal); nomes como publicados pela fonte, que podem mudar entre anos |
+| Validação | Soma dos programas = total do recorte |
+| Gráfico | Barras horizontais dos principais programas, demais agrupados em "Outros" |
+
+## Pergunta 9 — Fonte dos recursos
+
+| Item | Definição |
+| --- | --- |
+| Métrica | Valor e contratos por fonte de recursos e ano; participação no total |
+| Campos | `funding_source_name`, `reference_year`, `credit_amount`, `contract_count` |
+| Filtros | Série principal; UF opcional |
+| Agregação | `SUM` por ano e fonte; ranking das fontes |
+| Denominador | Total do mesmo recorte |
+| Riscos | Nomes como publicados pela fonte |
+| Validação | Soma das fontes = total do recorte |
+| Gráfico | Barras horizontais das principais fontes |
+
+## Pergunta 10 — Época do ano
+
+| Item | Definição |
+| --- | --- |
+| Métrica | Valor por mês de emissão e participação de cada mês no total do ano, em média no período |
+| Campos | `reference_month`, `reference_year`, `purpose`, `credit_amount` |
+| Filtros | Série principal; finalidade e UF opcionais |
+| Agregação | `SUM` por ano e mês; participação do mês no ano; média das participações entre os anos |
+| Denominador | Total de cada ano no mesmo recorte |
+| Riscos | O calendário agrícola segue o ano-safra (julho a junho), não o ano civil; meses de anos com volumes muito diferentes não devem ser somados sem normalizar |
+| Validação | As 12 participações de cada ano somam 100% |
+| Gráfico | Barras por mês (janeiro a dezembro) |
+
+## Pergunta 11 — Valor médio por contrato
+
+| Item | Definição |
+| --- | --- |
+| Métrica | Valor médio por contrato = `SUM(credit_amount) / SUM(contract_count)` no recorte |
+| Campos | `credit_amount`, `contract_count` e as dimensões do recorte (ano, UF, região, atividade, finalidade, programa) |
+| Filtros | Série principal; recorte escolhido |
+| Agregação | Razão das somas, nunca média de médias |
+| Denominador | `SUM(contract_count)` do recorte; sem cálculo se for zero |
+| Riscos | Média puxada por poucos contratos muito grandes; comparar médias de finalidades diferentes como se fossem o mesmo tipo de operação |
+| Validação | Média × contratos = valor total do recorte |
+| Gráfico | Barras por recorte, com o número de contratos ao lado |
+
+## Leitura conjunta
+
+Leitura das perguntas 1 a 11, no site (página "Sobre os dados") e no README, separando fato observado de hipótese.
+
+## Perguntas fora do escopo
+
+O assistente (D17) responde a estes casos com uma mensagem específica, sem números:
+
+| Tema | Situação dos dados | Resposta do assistente |
+| --- | --- | --- |
+| Município | Existe nos arquivos brutos; não carregado na versão 1 (D10, D19) | Explica que o projeto organiza os dados por estado e oferece o estado do município |
+| Instituição financeira | Existe nos arquivos brutos; não carregada na versão 1 (D19) | Explica que esse recorte ainda não está no projeto e oferece o total do estado ou por programa |
+| Pessoa ou empresa | Não é publicado pelo Banco Central | Explica que a fonte só publica totais agregados |
+| Juros, inadimplência, dívida | Existem em outras bases do Banco Central, não na MDCR usada (D19) | Explica que o projeto trata do crédito concedido: valor e número de contratos |
+| Previsões | Fora da versão 1 (D19) | Explica que o projeto descreve o que aconteceu e oferece a evolução recente |
+| Outros assuntos | — | Explica que responde só sobre crédito rural com os dados do projeto |
 
 ## Visualizações previstas
 
@@ -98,6 +189,7 @@ Desde 25/10/2026 a entrega é uma aplicação web ([arquitetura-aplicacao.md](ar
 
 ```
 consulta em sql/queries.sql → rota da API → gráfico no site
+                                         → ferramenta do assistente (D17)
 ```
 
 | Pergunta | Rota da API | Página do site |
@@ -107,5 +199,6 @@ consulta em sql/queries.sql → rota da API → gráfico no site
 | 3 | `/api/v1/regions/matopiba/yearly` | MATOPIBA |
 | 4 | `/api/v1/brazil/yearly` | Visão geral |
 | 5 | `/api/v1/brazil/yearly` | Visão geral |
+| 6 a 11 | Definidas na fase 5, junto com as ferramentas do assistente | Comparar estados, página do estado, explorar os dados |
 
-A API não recalcula indicadores em Python: ela executa as consultas de `queries.sql`. Um teste automatizado compara as respostas da API com o resultado direto das consultas.
+A API não recalcula indicadores em Python: ela executa as consultas de `queries.sql`. Um teste automatizado compara as respostas da API com o resultado direto das consultas. O assistente usa as mesmas rotas, então o número que ele responde é o mesmo que o painel mostra.

@@ -10,6 +10,7 @@ Aplicação web para consultar o crédito rural no Brasil com dados oficiais do 
 - **Página por estado:** série, composição e posição no ranking.
 - **Comparar estados** e ver o **MATOPIBA** (Maranhão, Tocantins, Piauí e Bahia) como região.
 - **Explorar os dados:** filtros por ano, UF, atividade, finalidade e programa, com download em CSV.
+- **Pergunte aos dados:** um assistente de IA responde perguntas em português com os números do banco, a fonte e um link para o mesmo recorte no painel.
 - **Sobre os dados:** fonte, data da coleta, método e limitações.
 
 ## Perguntas que o site responde
@@ -19,6 +20,14 @@ Aplicação web para consultar o crédito rural no Brasil com dados oficiais do 
 3. Como se comporta o crédito no MATOPIBA?
 4. Como os recursos se distribuem entre agricultura e pecuária?
 5. Quanto vai para custeio, investimento, comercialização e industrialização?
+6. Como estados e regiões se comparam?
+7. Qual é o perfil do crédito rural em cada estado?
+8. Quais programas concentram o crédito?
+9. De quais fontes vêm os recursos?
+10. Em que época do ano o crédito é contratado?
+11. Qual é o valor médio por contrato?
+
+O que o projeto não responde, e por quê, está no [plano de análise](docs/plano-analise.md#perguntas-fora-do-escopo).
 
 ## Fonte dos dados
 
@@ -33,6 +42,8 @@ Detalhes em [docs/fonte-dados.md](docs/fonte-dados.md).
 
 ```
 Arquivos do BCB → pipeline (Python) → PostgreSQL → API (FastAPI) → site (React) → usuário
+                                                     ↑
+                                          assistente de IA (ferramentas fechadas)
 ```
 
 | Camada | Tecnologia | Status |
@@ -41,8 +52,9 @@ Arquivos do BCB → pipeline (Python) → PostgreSQL → API (FastAPI) → site 
 | Banco | PostgreSQL 16 — `sql/schema.sql` | **Pronto e testado** |
 | Consultas | SQL — `sql/queries.sql` | Planejado (fase 4) |
 | API | FastAPI, Pydantic, SQLAlchemy Core | Planejado (fase 5) |
-| Site | React, Vite, TypeScript | Planejado (fase 6) |
-| Publicação | Neon (banco), Render (API), Vercel (site), GitHub Actions | Planejado (fase 7) |
+| Assistente | Modelo de linguagem em plano gratuito (Gemini, com reservas) e ferramentas sobre a API | Planejado (fase 6) |
+| Site | React, Vite, TypeScript | Planejado (fase 7) |
+| Publicação | Neon (banco), Render (API), Vercel (site), GitHub Actions | Planejado (fase 8) |
 
 Detalhes, rotas da API e segurança em [docs/arquitetura-aplicacao.md](docs/arquitetura-aplicacao.md).
 
@@ -100,8 +112,9 @@ O pipeline baixa os arquivos anuais do Banco Central, valida, agrega por estado 
 3. **Pipeline** de coleta, validação e carga, com testes — concluída
 4. **Consultas SQL** e série do IPCA
 5. **API** FastAPI com testes
-6. **Site** React
-7. **Publicação** e integração contínua
+6. **Assistente de IA** com ferramentas fechadas e avaliação
+7. **Site** React
+8. **Publicação** e integração contínua
 
 ## Documentação
 

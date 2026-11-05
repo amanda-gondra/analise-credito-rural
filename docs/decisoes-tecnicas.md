@@ -111,6 +111,28 @@ Formato de cada registro: contexto, decisão, alternativas e justificativa. Hip�
 - **Decisão:** o pipeline é o único que escreve no banco (usuário `loader`); a API usa um usuário só com `SELECT` (`api_reader`); o site só conversa com a API.
 - **Justificativa:** uma falha ou ataque na API não consegue alterar os dados.
 
+### D17 — Assistente de perguntas em linguagem natural (agente de IA)
+
+- **Contexto:** além de filtrar o painel, a pessoa deve poder perguntar em português ("Quanto o Piauí recebeu para pecuária em 2024?") e receber a resposta com os números do banco.
+- **Decisão:** o agente não escreve SQL. Ele escolhe entre ferramentas fechadas, uma por pergunta do [plano de análise](plano-analise.md), que executam as mesmas consultas de `sql/queries.sql` usadas pelo painel, com o usuário `api_reader`. Toda resposta traz o número, o período, a fonte, a data de coleta e um link que abre o painel com os mesmos filtros.
+- **Fora do escopo:** perguntas sobre município, instituição financeira, pessoas ou empresas, juros, inadimplência, previsões ou outros assuntos recebem uma resposta específica, que explica o motivo e sugere o que o projeto mostra (lista no plano de análise).
+- **Avaliação:** um conjunto de perguntas de teste com respostas conferidas direto no banco mede se o agente escolhe a ferramenta certa, acerta o número e recusa o que está fora do escopo.
+- **Alternativa descartada:** gerar SQL livre a partir da pergunta (text-to-SQL). Mais flexível, mas difícil de auditar e mais exposto a respostas erradas e a abusos.
+
+### D18 — Modelo de linguagem em planos gratuitos, com reserva
+
+- **Decisão:** provedor principal Google Gemini (modelos Flash, plano gratuito); reservas Groq e Cloudflare Workers AI, também gratuitos e sem cartão. Se um provedor falhar ou atingir o limite, a chamada passa para o próximo.
+- **Proteções:** as chaves ficam só nas variáveis de ambiente da API; limite diário de perguntas por visitante; tamanho máximo da pergunta; se todos os limites se esgotarem, o assistente avisa e o painel continua funcionando, porque não depende do modelo.
+- **Privacidade:** no plano gratuito do Gemini, o conteúdo enviado pode ser usado pelo Google para melhorar seus produtos. Os dados do projeto são públicos e agregados por estado, sem dado pessoal; o site informa isso junto do assistente.
+- **Risco aceito:** os planos gratuitos mudam sem aviso. A troca de provedor fica isolada em um único módulo.
+- **Verificado em:** 05/11/2026.
+
+### D19 — Versões do projeto
+
+- **Versão 1:** dados por estado, painel e agente com as 11 perguntas do plano de análise.
+- **Versão 1.1:** tabelas já agregadas por município (município × ano × atividade × finalidade) e por instituição financeira (instituição × UF × ano × finalidade), a partir dos mesmos arquivos brutos. Estimativa: algumas centenas de milhares de linhas, dentro do limite gratuito do Neon.
+- **Versão 2:** inadimplência do crédito rural por UF (SCR.data, outra base do Banco Central; mede a dívida em aberto, conceito diferente do crédito concedido), encargos financeiros por programa e previsão dos próximos meses com teste em anos anteriores e margem de incerteza.
+
 ## Pendências
 
 | # | Pendência | Status | Impacto |
@@ -126,4 +148,4 @@ Formato de cada registro: contexto, decisão, alternativas e justificativa. Hip�
 | P9 | Série e endereço do IPCA no SIDRA | Aberta | Necessária na fase de análise |
 | P10 | Último mês disponível em 2026 | Aberta | Só para análises parciais |
 | P11 | Tabela do IPCA no banco (estrutura e carga) | Aberta | Necessária para valores reais no site; entra no `schema.sql` na fase 4 |
-| P12 | Criação dos usuários `loader` e `api_reader` | Aberta | Script separado do `schema.sql`, na fase 3 |
+| P12 | Criação dos usuários `loader` e `api_reader` | **Resolvida:** `sql/roles.sql` (fase 3) | — |

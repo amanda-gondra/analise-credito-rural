@@ -137,8 +137,9 @@ O PostgreSQL gratuito do Render foi descartado: expira 30 dias após a criação
 | 3 | Pipeline: download, validação, agregação, carga + testes; Docker Compose com PostgreSQL local | — |
 | 4 | `queries.sql`: uma consulta por pergunta, com reconciliação; série do IPCA no banco | 3 |
 | 5 | API FastAPI com as rotas acima + testes | 4 |
-| 6 | Front-end React com as seis páginas | 5 |
-| 7 | Publicação (Neon, Render, Vercel) e CI no GitHub Actions | 6 |
+| 6 | Assistente de IA: ferramentas sobre as rotas da API, troca de provedor, limites e conjunto de avaliação (D17, D18) | 5 |
+| 7 | Front-end React com as seis páginas e o assistente | 6 |
+| 8 | Publicação (Neon, Render, Vercel) e CI no GitHub Actions | 7 |
 
 Cada fase é feita um arquivo por vez, com explicação de cada parte.
 
@@ -146,5 +147,6 @@ Cada fase é feita um arquivo por vez, com explicação de cada parte.
 
 - Login, contas de usuário e dados privados.
 - Mapas coloridos por estado (podem entrar depois da versão 1).
-- Análise por município ou por instituição financeira (os dados brutos permitem, mas exigem outra tabela).
+- Análise por município ou por instituição financeira (os dados brutos permitem; planejada para a versão 1.1, D19).
+- Inadimplência, juros e previsões (versão 2, D19).
 - Atualização automática diária dos dados.
