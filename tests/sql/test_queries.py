@@ -42,6 +42,8 @@ def test_every_question_has_its_query():
         "yearly_totals", "state_ranking", "matopiba_yearly", "activity_split", "purpose_split",
         "states_yearly", "regions_yearly", "program_ranking", "funding_source_ranking",
         "seasonality", "average_contract_value",
+        # metadata for the API
+        "loaded_years", "program_names", "latest_ipca",
     }
     assert set(load_queries()) == expected
 

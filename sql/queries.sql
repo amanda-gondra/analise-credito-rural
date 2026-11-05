@@ -380,3 +380,31 @@ SELECT
     ROUND(amount_real / NULLIF(contracts, 0), 2)    AS average_real
 FROM totals
 ORDER BY reference_year NULLS LAST;
+
+
+-- =============================================================================
+-- Metadata for the API (GET /api/v1/metadata): what is loaded and when it was collected.
+-- =============================================================================
+
+
+-- name: loaded_years
+-- One row per annual file loaded, with the collection date (the source revises its data).
+SELECT reference_year, collected_at, file_generated_at
+FROM source_file
+WHERE dataset = 'MATRIZ_CR_REGIAO'
+ORDER BY reference_year;
+
+
+-- name: program_names
+-- Programs as published by the source: the accepted values of the program filter.
+SELECT DISTINCT program_name
+FROM credit_monthly
+ORDER BY program_name;
+
+
+-- name: latest_ipca
+-- Last month of the IPCA series and when it was collected.
+SELECT reference_year, reference_month, collected_at
+FROM ipca_monthly
+ORDER BY reference_year DESC, reference_month DESC
+LIMIT 1;
