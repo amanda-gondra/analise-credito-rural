@@ -2,7 +2,7 @@
 
 Aplicação web para consultar o crédito rural no Brasil com dados oficiais do Banco Central: quanto é concedido, para onde vai e como mudou ao longo dos anos. Qualquer pessoa escolhe período, estado, atividade e finalidade e vê os números, os gráficos e a fonte.
 
-> **Status: Fase 2 concluída — fonte investigada e banco modelado.** O esquema do PostgreSQL existe e foi testado com dados reais de 2017 e 2024. O pipeline, a API e o site ainda não foram implementados.
+> **Status: Fase 3 concluída — pipeline funcionando.** Os dados de 2013 a 2025 são baixados do Banco Central, validados e carregados no PostgreSQL, com reconciliação até o centavo e testes automatizados. A API e o site ainda não foram implementados.
 
 ## O que o site vai oferecer
 
@@ -37,7 +37,7 @@ Arquivos do BCB → pipeline (Python) → PostgreSQL → API (FastAPI) → site 
 
 | Camada | Tecnologia | Status |
 | --- | --- | --- |
-| Pipeline | Python, pandas, SQLAlchemy, pytest | Planejado (fase 3) |
+| Pipeline | Python, pandas, SQLAlchemy, pytest | **Pronto e testado** |
 | Banco | PostgreSQL 16 — `sql/schema.sql` | **Pronto e testado** |
 | Consultas | SQL — `sql/queries.sql` | Planejado (fase 4) |
 | API | FastAPI, Pydantic, SQLAlchemy Core | Planejado (fase 5) |
@@ -52,28 +52,52 @@ Detalhes, rotas da API e segurança em [docs/arquitetura-aplicacao.md](docs/arqu
 | --- | --- | --- |
 | `docs/` | Escopo, fonte, dicionário, modelagem, arquitetura, qualidade e decisões | Pronto |
 | `sql/schema.sql` | Estrutura do banco | Pronto e testado |
-| `pipeline/` | Coleta, validação e carga | Planejado |
+| `pipeline/` | Coleta, validação e carga | Pronto e testado |
+| `sql/roles.sql` | Usuários do banco com permissões mínimas | Pronto e testado |
+| `tests/` | Testes automatizados (pytest) | Pronto |
 | `sql/queries.sql` | Consultas analíticas | Planejado |
 | `api/` | API FastAPI | Planejado |
 | `web/` | Site React | Planejado |
 | `data/` | Arquivos baixados (fora do Git) | Local |
 
-## Criar o banco localmente
+## Rodar localmente
 
-Pré-requisito: PostgreSQL 16 ou superior.
+Pré-requisitos: Docker e Python 3.12. Os comandos abaixo são do PowerShell, na pasta do projeto.
 
-```bash
-createdb rural_credit
-psql -d rural_credit -f sql/schema.sql
+### 1. Banco de dados
+
+```powershell
+Copy-Item .env.example .env   # depois troque as senhas no .env
+docker compose up -d
 ```
 
-O script cria o schema `rural_credit` com cinco tabelas e pode ser executado mais de uma vez sem erro. As instruções para carregar os dados, subir a API e o site serão adicionadas a cada fase.
+O PostgreSQL 16 sobe num contêiner, acessível só deste computador, e cria as tabelas de `sql/schema.sql` na primeira vez.
+
+### 2. Usuários do banco
+
+```powershell
+$cfg = Get-Content .env -Raw | ConvertFrom-StringData
+Get-Content sql\roles.sql -Raw | docker compose exec -T db psql -U postgres -d rural_credit -v ON_ERROR_STOP=1 -v loader_password="$($cfg.LOADER_PASSWORD)" -v api_reader_password="$($cfg.API_READER_PASSWORD)"
+```
+
+Cria `loader`, que o pipeline usa para gravar, e `api_reader`, que a API usa só para ler. Pode ser executado de novo para atualizar as senhas.
+
+### 3. Pipeline
+
+```powershell
+python -m venv .venv
+.venv\Scripts\python -m pip install -r pipeline\requirements-dev.txt
+.venv\Scripts\python -m pipeline.load 2013 2025
+.venv\Scripts\python -m pytest
+```
+
+O pipeline baixa os arquivos anuais do Banco Central, valida, agrega por estado e grava cada ano numa única transação, conferindo os totais até o centavo. Os 13 anos levam cerca de 3 minutos.
 
 ## Plano de execução
 
 1. **Escopo e documentação** — concluída
 2. **Fonte, perfil dos dados e banco** — concluída
-3. **Pipeline** de coleta, validação e carga, com testes
+3. **Pipeline** de coleta, validação e carga, com testes — concluída
 4. **Consultas SQL** e série do IPCA
 5. **API** FastAPI com testes
 6. **Site** React
