@@ -1,14 +1,14 @@
 """GET /api/v1/metadata: what the API accepts and which data is loaded.
 
-The site fills its filters from here, and the assistant reads the collection dates
-to say how recent a number is.
+The site fills its filters from here, shows the collection dates next to the numbers
+and hides the assistant when no language model is configured.
 """
 
 from __future__ import annotations
 
 from fastapi import APIRouter
 
-from api.app.dependencies import DatabaseDep
+from api.app.dependencies import AssistantDep, DatabaseDep
 from api.app.filters import ACTIVITIES, MAIN_SERIES, MATOPIBA, PURPOSES, REGIONS, STATES
 from api.app.schemas import LoadedYear, Metadata, Period, PriceIndexInfo
 
@@ -16,7 +16,7 @@ router = APIRouter(prefix="/api/v1", tags=["metadata"])
 
 
 @router.get("/metadata", response_model=Metadata, summary="Accepted values and loaded data")
-def metadata(database: DatabaseDep) -> Metadata:
+def metadata(database: DatabaseDep, assistant: AssistantDep) -> Metadata:
     latest = database.fetch("latest_ipca")
     price_index = (
         PriceIndexInfo(
@@ -36,4 +36,5 @@ def metadata(database: DatabaseDep) -> Metadata:
         purposes=list(PURPOSES),
         programs=[row["program_name"] for row in database.fetch("program_names")],
         price_index=price_index,
+        assistant_available=assistant.available,
     )

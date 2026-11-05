@@ -1,0 +1,48 @@
+"""POST /api/v1/assistant/ask: a question in Portuguese, answered with the project's numbers.
+
+Order of the checks, cheapest first: body size (middleware), JSON and question length
+(Pydantic), assistant configured, visitor and site quotas; only then the language model.
+The answer comes with the rows it was written from and the page of the panel to check it.
+"""
+
+from __future__ import annotations
+
+from fastapi import APIRouter, Request
+
+from api.app.assistant.agent import AssistantUnavailableError
+from api.app.dependencies import AssistantDep, DatabaseDep, QuotaDep
+from api.app.errors import ErrorResponse
+from api.app.schemas import AskRequest, AskResponse, AssistantSource
+
+router = APIRouter(prefix="/api/v1/assistant", tags=["assistant"])
+
+
+@router.post(
+    "/ask",
+    response_model=AskResponse,
+    summary="Ask the assistant (closed tools over the routes of this API)",
+    responses={
+        429: {"model": ErrorResponse, "description": "Question limit of the visitor or of the site"},
+        503: {"model": ErrorResponse, "description": "No language model available"},
+    },
+)
+def ask(
+    body: AskRequest,
+    request: Request,
+    database: DatabaseDep,
+    assistant: AssistantDep,
+    quota: QuotaDep,
+) -> AskResponse:
+    if not assistant.available:
+        raise AssistantUnavailableError
+    quota.consume(request.client.host if request.client else "unknown")
+    answer = assistant.ask(body.question, database)
+    return AskResponse(
+        answer=answer.answer,
+        out_of_scope=answer.out_of_scope,
+        provider=answer.provider,
+        sources=[
+            AssistantSource(tool=r.tool, filters=r.filters, panel_path=r.panel_path, data=r.data)
+            for r in answer.results
+        ],
+    )

@@ -15,7 +15,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Annotated, Any, Final, Generic, Literal, TypeVar
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StringConstraints
 
 from api.app.filters import ACTIVITY_BY_CODE, PRICE_BASE, Activity, Region
 
@@ -192,6 +192,42 @@ class Metadata(BaseModel):
     purposes: list[str]
     programs: list[str] = Field(description="Accepted values of the program filter.")
     price_index: PriceIndexInfo | None
+    assistant_available: bool = Field(description="False when no language model provider is configured.")
+
+
+class AskRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    question: Annotated[str, StringConstraints(strip_whitespace=True, min_length=3, max_length=500)] = Field(
+        description="Question in Portuguese about rural credit in Brazil (3 to 500 characters)."
+    )
+
+
+class AssistantSource(BaseModel):
+    tool: str = Field(description="Tool the assistant used; each matches one route of this API.")
+    filters: dict[str, Any] = Field(description="Filters of the tool, with the words of the API.")
+    panel_path: str = Field(description="Page of the site with the same filters, to check the answer.")
+    data: Any = Field(description="Rows the answer was written from, in the format of the matching route.")
+
+
+class AssistantMeta(BaseModel):
+    source: str = SOURCE
+    price_index: str = PRICE_INDEX
+    price_base: str = PRICE_BASE
+    notice: str = Field(
+        default=(
+            "Resposta escrita por um modelo de linguagem a partir dos dados do projeto. "
+            "Os números vêm do banco; confira no painel."
+        )
+    )
+
+
+class AskResponse(BaseModel):
+    answer: str
+    out_of_scope: bool = Field(description="True when the question is outside what the project answers.")
+    provider: str = Field(description="Language model provider that answered.")
+    sources: list[AssistantSource]
+    meta: AssistantMeta = Field(default_factory=AssistantMeta)
 
 
 class Health(BaseModel):
