@@ -157,3 +157,10 @@ def test_openapi_documents_every_route_as_get_only(client):
         "/api/v1/purposes/yearly", "/api/v1/programs/ranking", "/api/v1/funding-sources/ranking", "/health",
     }
     assert all(set(methods) == {"get"} for methods in paths.values())
+
+
+def test_root_redirects_to_the_documentation(client):
+    response = client.get("/", follow_redirects=False)
+
+    assert response.status_code == 307
+    assert response.headers["location"] == "/docs"

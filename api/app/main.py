@@ -21,6 +21,7 @@ from typing import Final
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 
 from api.app.config import Settings, get_settings
 from api.app.database import Database, QueryRunner
@@ -97,6 +98,11 @@ def create_app(settings: Settings | None = None, database: QueryRunner | None = 
         health.router,
     ):
         app.include_router(router)
+
+    # Whoever opens the bare address lands on the documentation instead of a 404.
+    @app.get("/", include_in_schema=False)
+    def root() -> RedirectResponse:
+        return RedirectResponse("/docs")
 
     # add_middleware puts each new middleware outside the previous ones.
     app.add_middleware(RateLimitMiddleware, requests_per_minute=settings.rate_limit_per_minute)

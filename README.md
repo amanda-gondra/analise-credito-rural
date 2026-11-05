@@ -115,7 +115,7 @@ O `pytest` roda os testes do pipeline e, com o banco no ar e carregado, também 
 .venv\Scripts\python -m uvicorn api.app.main:create_app --factory --port 8000
 ```
 
-A documentação interativa fica em http://127.0.0.1:8000/docs. A API conecta como `api_reader` (senha do `.env`), só lê, aceita apenas `GET` e limita a 60 pedidos por minuto por cliente. Exemplo: http://127.0.0.1:8000/api/v1/states/PI/profile mostra o perfil do Piauí de 2017 a 2025.
+A documentação interativa fica em http://127.0.0.1:8000/docs (o endereço sem `/docs` também leva até ela). Se aparecer `No module named 'api'`, o comando foi rodado fora da pasta do projeto; se `/health` responder `unavailable`, o Docker está desligado. A API conecta como `api_reader` (senha do `.env`), só lê, aceita apenas `GET` e limita a 60 pedidos por minuto por cliente. Exemplo: http://127.0.0.1:8000/api/v1/states/PI/profile mostra o perfil do Piauí de 2017 a 2025.
 
 O `pytest` passa a rodar também os testes da API (`api/tests`): validação dos filtros, formato dos erros, CORS e limite de pedidos sem banco; e, com o banco carregado, se as rotas concordam entre si.
 
