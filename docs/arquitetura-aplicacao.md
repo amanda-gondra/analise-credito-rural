@@ -2,7 +2,7 @@
 
 O projeto deixa de terminar num notebook e passa a ser uma aplicação web pública: qualquer pessoa entra no site, escolhe período, estado, atividade e finalidade e vê a análise do crédito rural com dados oficiais do Banco Central.
 
-**Status:** pipeline, banco, consultas e API prontos e testados (fases 3 a 5). Assistente, site e publicação ainda não implementados.
+**Status:** pipeline, banco, consultas e API prontos e testados (fases 3 a 5). Assistente implementado, com avaliação pendente (fase 6). Site e publicação ainda não implementados.
 
 ## Para quem é
 
@@ -102,6 +102,34 @@ Um parâmetro desconhecido ou fora da lista é recusado com 422, em vez de ser i
 Toda rota de dados responde `{"data", "meta"}`. `meta` traz a fonte, o índice de preços (IPCA, preços de dez/2025) e os filtros aplicados, para que o site e o assistente citem o número com período e fonte (D17). A documentação interativa fica em `/docs` (gerada pelo FastAPI).
 
 A tabela paginada e o download em CSV da página "Explorar dados" (`/api/v1/credit` e `/api/v1/credit.csv`) ficam para a fase 7, junto com a página que os usa.
+
+## Assistente de IA (fase 6)
+
+`POST /api/v1/assistant/ask` recebe `{"question": "..."}` (3 a 500 caracteres) e devolve a resposta em português, as linhas usadas (`sources[].data`), os filtros e o endereço da página do painel com o mesmo recorte (`panel_path`). Código em `api/app/assistant/`.
+
+```
+pergunta → modelo de linguagem → escolhe uma ferramenta → mesma consulta da rota → resultado
+                    ↑                                                                 │
+                    └──────────────────── escreve a resposta ─────────────────────────┘
+```
+
+| Peça | Arquivo | O que faz |
+| --- | --- | --- |
+| Ferramentas | `tools.py` | Uma por pergunta do plano; cada uma usa o mesmo filtro, a mesma consulta e o mesmo formato da rota correspondente. O modelo não escreve SQL nem vê o banco |
+| Fora do escopo | `scope.py` | O modelo só classifica o tema (município, instituição, pessoa, juros, previsão, outro); o texto da recusa é fixo, sem números |
+| Instruções | `prompt.py` | Números só das ferramentas, período padrão 2017–2025, valores reais ao comparar anos, resposta curta com fonte |
+| Provedores | `providers.py` | Gemini (formato próprio) e o formato chat/completions (Groq e Cloudflare); falhas viram `ProviderError` |
+| Laço | `agent.py` | Até 3 rodadas de ferramentas; se um provedor falha, a pergunta recomeça no próximo; se todos falham, 503 |
+| Limites | `quota.py` | Perguntas por visitante por minuto e por dia, e um teto diário do site, antes de chamar o modelo |
+
+| Risco | Controle |
+| --- | --- |
+| Número inventado | Toda resposta vem com as linhas da consulta e o link do painel; as instruções proíbem números que não vieram de uma ferramenta; o conjunto de avaliação (fase 6.2) mede o acerto |
+| Instrução escondida na pergunta | O modelo só tem ferramentas de leitura com filtros validados; o pior caso é uma resposta fora do assunto, nunca um acesso novo ao banco |
+| Abuso e custo | Limites por visitante e do site, pergunta de até 500 caracteres, corpo de até 4 KB, tempo máximo por chamada; só planos gratuitos |
+| Chaves | Só em variáveis de ambiente, enviadas no cabeçalho (nunca na URL) e fora dos logs |
+| Privacidade | Os logs não guardam a pergunta nem a resposta; os dados enviados ao modelo são públicos e agregados por estado (D18) |
+| Provedor fora do ar | Troca automática; sem nenhum provedor, `assistant_available` fica falso em `/api/v1/metadata` e o painel funciona normalmente |
 
 ## Segurança
 

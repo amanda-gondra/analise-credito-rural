@@ -52,7 +52,7 @@ Arquivos do BCB → pipeline (Python) → PostgreSQL → API (FastAPI) → site 
 | Banco | PostgreSQL 16 — `sql/schema.sql` | **Pronto e testado** |
 | Consultas | SQL — `sql/queries.sql` e a visão `credit_monthly_adjusted` | **Pronto e testado** |
 | API | FastAPI, Pydantic, SQLAlchemy Core — `api/` | **Pronto e testado** |
-| Assistente | Modelo de linguagem em plano gratuito (Gemini, com reservas) e ferramentas sobre a API | Planejado (fase 6) |
+| Assistente | Modelo de linguagem em plano gratuito (Gemini, com Groq e Cloudflare de reserva) e ferramentas sobre as consultas — `api/app/assistant/` | Implementado; avaliação em andamento (fase 6) |
 | Site | React, Vite, TypeScript | Planejado (fase 7) |
 | Publicação | Neon (banco), Render (API), Vercel (site), GitHub Actions | Planejado (fase 8) |
 
@@ -117,7 +117,9 @@ O `pytest` roda os testes do pipeline e, com o banco no ar e carregado, também 
 
 A documentação interativa fica em http://127.0.0.1:8000/docs (o endereço sem `/docs` também leva até ela). Se aparecer `No module named 'api'`, o comando foi rodado fora da pasta do projeto; se `/health` responder `unavailable`, o Docker está desligado. A API conecta como `api_reader` (senha do `.env`), só lê, aceita apenas `GET` e limita a 60 pedidos por minuto por cliente. Exemplo: http://127.0.0.1:8000/api/v1/states/PI/profile mostra o perfil do Piauí de 2017 a 2025.
 
-O `pytest` passa a rodar também os testes da API (`api/tests`): validação dos filtros, formato dos erros, CORS e limite de pedidos sem banco; e, com o banco carregado, se as rotas concordam entre si.
+O `pytest` passa a rodar também os testes da API (`api/tests`): validação dos filtros, formato dos erros, CORS e limite de pedidos sem banco; e, com o banco carregado, se as rotas concordam entre si. Os testes do assistente usam provedores simulados: não chamam nenhum modelo nem precisam de chave.
+
+O assistente (`POST /api/v1/assistant/ask`) só responde com pelo menos uma chave gratuita no `.env` (`GEMINI_API_KEY`, `GROQ_API_KEY` ou `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_API_TOKEN`). Sem chave, ele responde 503 e o resto da API funciona normalmente.
 
 ## Plano de execução
 
