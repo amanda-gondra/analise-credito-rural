@@ -2,7 +2,7 @@
 
 Aplicação web para consultar o crédito rural no Brasil com dados oficiais do Banco Central: quanto é concedido, para onde vai e como mudou ao longo dos anos. Qualquer pessoa escolhe período, estado, atividade e finalidade e vê os números, os gráficos e a fonte.
 
-> **Status: Fase 5 concluída — API pronta.** Os dados de 2013 a 2025 são baixados do Banco Central, validados e carregados no PostgreSQL com reconciliação até o centavo; o IPCA do IBGE permite mostrar valores corrigidos; as 11 perguntas têm consultas SQL testadas contra o banco e uma API somente leitura que as publica. O assistente e o site ainda não foram implementados.
+> **Status: Fase 6 concluída — API e assistente prontos.** Os dados de 2013 a 2025 são baixados do Banco Central, validados e carregados no PostgreSQL com reconciliação até o centavo; o IPCA do IBGE permite mostrar valores corrigidos; as 11 perguntas têm consultas SQL testadas contra o banco, uma API somente leitura que as publica e um assistente de IA avaliado com 35 perguntas. O site ainda não foi implementado.
 
 ## O que o site vai oferecer
 
@@ -52,7 +52,7 @@ Arquivos do BCB → pipeline (Python) → PostgreSQL → API (FastAPI) → site 
 | Banco | PostgreSQL 16 — `sql/schema.sql` | **Pronto e testado** |
 | Consultas | SQL — `sql/queries.sql` e a visão `credit_monthly_adjusted` | **Pronto e testado** |
 | API | FastAPI, Pydantic, SQLAlchemy Core — `api/` | **Pronto e testado** |
-| Assistente | Modelo de linguagem em plano gratuito (Gemini, com Groq e Cloudflare de reserva) e ferramentas sobre as consultas — `api/app/assistant/` | Implementado; avaliação em andamento (fase 6) |
+| Assistente | Modelo de linguagem em plano gratuito (Gemini, com Groq e Cloudflare de reserva) e ferramentas sobre as consultas — `api/app/assistant/` | **Pronto e avaliado** |
 | Site | React, Vite, TypeScript | Planejado (fase 7) |
 | Publicação | Neon (banco), Render (API), Vercel (site), GitHub Actions | Planejado (fase 8) |
 
@@ -115,11 +115,26 @@ O `pytest` roda os testes do pipeline e, com o banco no ar e carregado, também 
 .venv\Scripts\python -m uvicorn api.app.main:create_app --factory --port 8000
 ```
 
-A documentação interativa fica em http://127.0.0.1:8000/docs (o endereço sem `/docs` também leva até ela). Se aparecer `No module named 'api'`, o comando foi rodado fora da pasta do projeto; se `/health` responder `unavailable`, o Docker está desligado. A API conecta como `api_reader` (senha do `.env`), só lê, aceita apenas `GET` e limita a 60 pedidos por minuto por cliente. Exemplo: http://127.0.0.1:8000/api/v1/states/PI/profile mostra o perfil do Piauí de 2017 a 2025.
+A documentação interativa fica em http://127.0.0.1:8000/docs (o endereço sem `/docs` também leva até ela). Se aparecer `No module named 'api'`, o comando foi rodado fora da pasta do projeto; se `/health` responder `unavailable`, o Docker está desligado. A API conecta como `api_reader` (senha do `.env`), só lê, aceita `GET` (e `POST` apenas na rota do assistente) e limita a 60 pedidos por minuto por cliente. Exemplo: http://127.0.0.1:8000/api/v1/states/PI/profile mostra o perfil do Piauí de 2017 a 2025.
 
 O `pytest` passa a rodar também os testes da API (`api/tests`): validação dos filtros, formato dos erros, CORS e limite de pedidos sem banco; e, com o banco carregado, se as rotas concordam entre si. Os testes do assistente usam provedores simulados: não chamam nenhum modelo nem precisam de chave.
 
-O assistente (`POST /api/v1/assistant/ask`) só responde com pelo menos uma chave gratuita no `.env` (`GEMINI_API_KEY`, `GROQ_API_KEY` ou `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_API_TOKEN`). Sem chave, ele responde 503 e o resto da API funciona normalmente.
+O assistente (`POST /api/v1/assistant/ask`) só responde com pelo menos uma chave gratuita no `.env` (`GEMINI_API_KEY`, `GROQ_API_KEY` ou `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_API_TOKEN`). Sem chave, ele responde 503 e o resto da API funciona normalmente. A chave do Gemini é criada no AI Studio num projeto **sem faturamento**, para continuar no plano gratuito.
+
+### 5. Avaliação do assistente
+
+```powershell
+.venv\Scripts\python -m api.evaluation.run --provider gemini
+```
+
+Faz as 35 perguntas de `api/evaluation/cases.json` ao modelo real, com o banco local, e grava um relatório em `api/evaluation/reports/`. Cada caso confere três coisas: se o assistente usou a ferramenta e os filtros esperados; se cada número escrito na resposta é o arredondamento correto de um valor que veio do banco; e se as perguntas fora do escopo recebem a recusa do tema certo. Gasta cota gratuita, por isso não roda no `pytest`.
+
+| Rodada (06/11/2026, `gemini-3.5-flash-lite`) | Aprovados | Ferramenta certa | Números conferem | Recusas certas | Tempo mediano |
+| --- | --- | --- | --- | --- | --- |
+| [1ª](api/evaluation/reports/2026-11-06-gemini-gemini-3.5-flash-lite-run1.md) | 31 de 35 | 24 de 24 | 22 de 24 | 6 de 7 | 2,4 s |
+| [2ª](api/evaluation/reports/2026-11-06-gemini-gemini-3.5-flash-lite-run2.md) | 35 de 35 | 25 de 25 | 25 de 25 | 7 de 7 | 2,5 s |
+
+Na 1ª rodada o modelo cortou uma casa decimal (66,5% em vez de 66,6%), somou por conta própria um total que não veio do banco (R$ 50,9 bi; o certo é R$ 51,07 bi) e classificou "previsão do tempo" como previsão de crédito; uma pergunta falhou por limite de pedidos do plano gratuito. Entre as rodadas, as instruções passaram a proibir somas feitas pelo modelo e a exigir arredondamento, e cada tema de recusa ganhou uma descrição. As mudanças são gerais, mas a 2ª rodada usou as mesmas perguntas, e um modelo de linguagem não responde sempre igual: o resultado é uma medida deste conjunto, não uma garantia.
 
 ## Plano de execução
 
@@ -128,7 +143,7 @@ O assistente (`POST /api/v1/assistant/ask`) só responde com pelo menos uma chav
 3. **Pipeline** de coleta, validação e carga, com testes — concluída
 4. **Consultas SQL** e série do IPCA — concluída
 5. **API** FastAPI com testes — concluída
-6. **Assistente de IA** com ferramentas fechadas e avaliação
+6. **Assistente de IA** com ferramentas fechadas e avaliação — concluída
 7. **Site** React
 8. **Publicação** e integração contínua
 

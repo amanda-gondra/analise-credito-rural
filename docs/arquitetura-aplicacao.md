@@ -2,7 +2,7 @@
 
 O projeto deixa de terminar num notebook e passa a ser uma aplicação web pública: qualquer pessoa entra no site, escolhe período, estado, atividade e finalidade e vê a análise do crédito rural com dados oficiais do Banco Central.
 
-**Status:** pipeline, banco, consultas e API prontos e testados (fases 3 a 5). Assistente implementado, com avaliação pendente (fase 6). Site e publicação ainda não implementados.
+**Status:** pipeline, banco, consultas, API e assistente prontos e testados (fases 3 a 6). Site e publicação ainda não implementados.
 
 ## Para quem é
 
@@ -124,7 +124,7 @@ pergunta → modelo de linguagem → escolhe uma ferramenta → mesma consulta d
 
 | Risco | Controle |
 | --- | --- |
-| Número inventado | Toda resposta vem com as linhas da consulta e o link do painel; as instruções proíbem números que não vieram de uma ferramenta; o conjunto de avaliação (fase 6.2) mede o acerto |
+| Número inventado | Toda resposta vem com as linhas da consulta e o link do painel; as instruções proíbem números que não vieram de uma ferramenta e somas feitas pelo modelo; o conjunto de avaliação (`api/evaluation/`) confere se cada número escrito é o arredondamento de um valor do banco |
 | Instrução escondida na pergunta | O modelo só tem ferramentas de leitura com filtros validados; o pior caso é uma resposta fora do assunto, nunca um acesso novo ao banco |
 | Abuso e custo | Limites por visitante e do site, pergunta de até 500 caracteres, corpo de até 4 KB, tempo máximo por chamada; só planos gratuitos |
 | Chaves | Só em variáveis de ambiente, enviadas no cabeçalho (nunca na URL) e fora dos logs |
