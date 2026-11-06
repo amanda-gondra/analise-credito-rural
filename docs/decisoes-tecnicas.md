@@ -116,7 +116,7 @@ Formato de cada registro: contexto, decisão, alternativas e justificativa. Hip�
 - **Contexto:** além de filtrar o painel, a pessoa deve poder perguntar em português ("Quanto o Piauí recebeu para pecuária em 2024?") e receber a resposta com os números do banco.
 - **Decisão:** o agente não escreve SQL. Ele escolhe entre ferramentas fechadas, uma por pergunta do [plano de análise](plano-analise.md), que executam as mesmas consultas de `sql/queries.sql` usadas pelo painel, com o usuário `api_reader`. Toda resposta traz o número, o período, a fonte, a data de coleta e um link que abre o painel com os mesmos filtros.
 - **Fora do escopo:** perguntas sobre município, instituição financeira, pessoas ou empresas, juros, inadimplência, previsões ou outros assuntos recebem uma resposta específica, que explica o motivo e sugere o que o projeto mostra (lista no plano de análise).
-- **Avaliação:** um conjunto de perguntas de teste com respostas conferidas direto no banco mede se o agente escolhe a ferramenta certa, acerta o número e recusa o que está fora do escopo.
+- **Avaliação:** um conjunto de perguntas de teste com respostas conferidas direto no banco mede se o agente escolhe a ferramenta certa, acerta o número e recusa o que está fora do escopo. Implementado em `api/evaluation/` (35 casos); em 06/11/2026, com `gemini-3.5-flash-lite`, 31 de 35 na 1ª rodada e 35 de 35 na 2ª, depois de proibir somas feitas pelo modelo e exigir arredondamento (relatórios em `api/evaluation/reports/`).
 - **Alternativa descartada:** gerar SQL livre a partir da pergunta (text-to-SQL). Mais flexível, mas difícil de auditar e mais exposto a respostas erradas e a abusos.
 
 ### D18 — Modelo de linguagem em planos gratuitos, com reserva
@@ -125,7 +125,9 @@ Formato de cada registro: contexto, decisão, alternativas e justificativa. Hip�
 - **Proteções:** as chaves ficam só nas variáveis de ambiente da API; limite diário de perguntas por visitante; tamanho máximo da pergunta; se todos os limites se esgotarem, o assistente avisa e o painel continua funcionando, porque não depende do modelo.
 - **Privacidade:** no plano gratuito do Gemini, o conteúdo enviado pode ser usado pelo Google para melhorar seus produtos. Os dados do projeto são públicos e agregados por estado, sem dado pessoal; o site informa isso junto do assistente.
 - **Risco aceito:** os planos gratuitos mudam sem aviso. A troca de provedor fica isolada em um único módulo.
-- **Verificado em:** 05/11/2026.
+- **Modelo escolhido:** `gemini-3.5-flash-lite`. Em 06/11/2026, com as 13 ferramentas, o `gemini-3.6-flash` levou de 11 a 14 s por chamada (uma passou de 30 s e outra voltou 503, sobrecarga), e o Flash-Lite levou cerca de 1 s escolhendo a mesma ferramenta com os mesmos filtros. Cada pergunta usa pelo menos duas chamadas. O modelo é configurável (`GEMINI_MODEL`) e o conjunto de avaliação mede se a troca piora o acerto.
+- **Faturamento:** a chave do Gemini é criada num projeto do AI Studio **sem** faturamento; ligar uma conta de cobrança tira o projeto do plano gratuito.
+- **Verificado em:** 05/11/2026 e 06/11/2026.
 
 ### D19 — Versões do projeto
 

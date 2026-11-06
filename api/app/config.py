@@ -63,7 +63,8 @@ class Settings(BaseSettings):
         default_factory=lambda: ["gemini", "groq", "cloudflare"]
     )
     gemini_api_key: SecretStr | None = None
-    gemini_model: str = "gemini-3.6-flash"
+    # Flash-Lite: picks the same tools as Flash in ~1 s instead of 10-30 s on the free tier (06/11/2026).
+    gemini_model: str = "gemini-3.5-flash-lite"
     groq_api_key: SecretStr | None = None
     groq_model: str = "llama-3.3-70b-versatile"
     cloudflare_account_id: str | None = None
