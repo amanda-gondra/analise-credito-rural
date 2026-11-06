@@ -287,7 +287,16 @@ DECLARATIONS: Final[tuple[dict[str, Any], ...]] = (
         "institutions, people or companies, interest rates, default or debt, forecasts, or any other subject.",
         "parameters": {
             "type": "object",
-            "properties": {"topic": {"type": "string", "enum": list(TOPICS)}},
+            "properties": {
+                "topic": {
+                    "type": "string",
+                    "enum": list(TOPICS),
+                    "description": "municipality: a city or municipality. financial_institution: banks or "
+                    "cooperatives. person_or_company: a specific person, farm or company. "
+                    "interest_default_or_debt: interest rates, default, debt or repayment. forecast: future "
+                    "values of rural credit. other: anything else, such as weather, prices, politics or chat.",
+                }
+            },
             "required": ["topic"],
         },
     },
