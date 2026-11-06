@@ -214,6 +214,9 @@ class AssistantMeta(BaseModel):
     source: str = SOURCE
     price_index: str = PRICE_INDEX
     price_base: str = PRICE_BASE
+    collected_at: datetime | None = Field(
+        default=None, description="Most recent collection of the loaded files (the source is revised daily)."
+    )
     notice: str = Field(
         default=(
             "Resposta escrita por um modelo de linguagem a partir dos dados do projeto. "

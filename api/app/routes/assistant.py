@@ -12,7 +12,7 @@ from fastapi import APIRouter, Request
 from api.app.assistant.agent import AssistantUnavailableError
 from api.app.dependencies import AssistantDep, DatabaseDep, QuotaDep
 from api.app.errors import ErrorResponse
-from api.app.schemas import AskRequest, AskResponse, AssistantSource
+from api.app.schemas import AskRequest, AskResponse, AssistantMeta, AssistantSource
 
 router = APIRouter(prefix="/api/v1/assistant", tags=["assistant"])
 
@@ -37,7 +37,9 @@ def ask(
         raise AssistantUnavailableError
     quota.consume(request.client.host if request.client else "unknown")
     answer = assistant.ask(body.question, database)
+    collected = [row["collected_at"] for row in database.fetch("loaded_years")]
     return AskResponse(
+        meta=AssistantMeta(collected_at=max(collected, default=None)),
         answer=answer.answer,
         out_of_scope=answer.out_of_scope,
         provider=answer.provider,

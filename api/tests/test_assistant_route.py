@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import UTC, datetime
 
 import pytest
 
@@ -17,7 +18,11 @@ def answering(*replies) -> list[ScriptedProvider]:
     return [ScriptedProvider("gemini", list(replies))]
 
 
-def test_answer_comes_with_its_sources_and_panel_links(make_client):
+def test_answer_comes_with_its_sources_and_panel_links(make_client, fake_db):
+    fake_db.rows["loaded_years"] = [
+        {"reference_year": 2024, "collected_at": datetime(2026, 10, 23, 12, 0, tzinfo=UTC)},
+        {"reference_year": 2025, "collected_at": datetime(2026, 10, 24, 9, 30, tzinfo=UTC)},
+    ]
     client = make_client(providers=answering(
         call_reply(("yearly_totals", {"state": "PI"})),
         text_reply("O Piauí recebeu... Fonte: Banco Central do Brasil (MDCR)."),
@@ -36,6 +41,7 @@ def test_answer_comes_with_its_sources_and_panel_links(make_client):
         "data": [],
     }]
     assert body["meta"]["price_base"] == "2025-12"
+    assert body["meta"]["collected_at"] == "2026-10-24T09:30:00Z"
 
 
 def test_refusal_is_flagged(make_client):
