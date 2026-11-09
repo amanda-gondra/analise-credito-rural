@@ -1,5 +1,6 @@
-# Downloaded source files and reference documents (re-downloadable, ~230 MB)
-data/
+# Downloaded source files and reference documents (re-downloadable, ~230 MB).
+# Anchored to the root: web/src/data and web/src/components/data are source code.
+/data/
 
 # Python
 .venv/
