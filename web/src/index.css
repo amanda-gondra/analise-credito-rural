@@ -1,0 +1,91 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens of the interface. Colors of data (map ramps, series, categories) live in
+ * src/lib/palette.ts, next to the code that draws them; everything else is here.
+ *
+ * Contrast (WCAG 2.2), checked on #FFFFFF and on the page background #F7F8F4:
+ *   ink 14.97 / 14.03 · ink-2 5.63 / 5.28 · forest 10.05 / 9.43 · petroleum 7.40 / 6.93
+ *   control borders 3.58 / 3.36 (non-text, minimum 3) · white on forest 10.05
+ * leaf (#78A85A, 2.78 on white) is decorative only: never text, never the only sign of a state.
+ */
+@theme {
+  --font-sans: "Public Sans Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --color-forest: #174b32;
+  --color-forest-hover: #113b27;
+  --color-forest-active: #0d2f1f;
+  --color-forest-50: #f0f6f2;
+  --color-forest-100: #e5efe8;
+  --color-forest-200: #c9ddd0;
+  --color-petroleum: #315b6b;
+  --color-petroleum-50: #e7eef1;
+  --color-leaf: #78a85a;
+
+  --color-canvas: #f7f8f4;
+  --color-surface: #ffffff;
+  --color-sunken: #f1f3ee;
+  --color-ink: #202923;
+  --color-ink-2: #5f6a63;
+  --color-line: #e4e9e3;
+  --color-control: #7f8a82;
+
+  --color-danger: #b3261e;
+  --color-danger-50: #fbeae8;
+  --color-warning: #8a5a00;
+  --color-warning-50: #fbf3e4;
+
+  --shadow-card: 0 1px 2px rgb(32 41 35 / 0.05);
+  --shadow-panel: 0 18px 40px -12px rgb(23 75 50 / 0.28), 0 2px 8px rgb(32 41 35 / 0.08);
+  --shadow-fab: 0 8px 20px -6px rgb(23 75 50 / 0.45);
+
+  --breakpoint-xs: 25rem;
+}
+
+@layer base {
+  html {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  body {
+    min-height: 100dvh;
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* One visible focus style for keyboard users, none after a mouse click. */
+  :focus-visible {
+    outline: 2px solid var(--color-forest);
+    outline-offset: 2px;
+  }
+
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  summary {
+    cursor: pointer;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Space kept free at the bottom of every page so the assistant button never covers content. */
+@utility pb-fab {
+  padding-bottom: calc(6rem + env(safe-area-inset-bottom));
+}
