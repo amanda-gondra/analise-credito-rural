@@ -31,14 +31,29 @@ export const MAP_RAMP = {
 /** Text on a map class: ink on the light classes, white on the dark ones. */
 export const MAP_LABEL = ["#202923", "#202923", "#202923", "#202923", "#ffffff", "#ffffff"] as const;
 
-/** terracotta, brown, mustard, graphite, wine. Worst pair: dE 13.7 deuteranopia, 11.4 protanopia. */
-export const CATEGORY = ["#c0502f", "#4b3a10", "#a8840f", "#77736b", "#7e1f3d"] as const;
+/**
+ * Blue, orange, teal, ochre, rose: lighter and more balanced than the earlier earth tones, and
+ * none of them is the green of Agricultura or the petroleum of Pecuária. In this order (it is
+ * part of the check) the dataviz validator passes every gate on white and on the page canvas:
+ * OKLCH lightness 0.43-0.77, chroma >= 0.10, worst adjacent pair dE 11.6 under protanopia
+ * (target >= 8) and 18.5 in normal vision (floor 15), every slot >= 3:1 against the surface.
+ */
+export const CATEGORY = ["#2b73a8", "#d9732c", "#1f9a8a", "#b8860b", "#c4527a"] as const;
 
 export const PURPOSE_COLOR = {
   custeio: CATEGORY[0],
   investimento: CATEGORY[1],
   comercializacao: CATEGORY[2],
   industrializacao: CATEGORY[3],
+} as const;
+
+/** Each region keeps its color on every page (charts, the list of states). */
+export const REGION_COLOR = {
+  norte: CATEGORY[0],
+  nordeste: CATEGORY[1],
+  sudeste: CATEGORY[2],
+  sul: CATEGORY[3],
+  "centro-oeste": CATEGORY[4],
 } as const;
 
 export const NEUTRAL = {
