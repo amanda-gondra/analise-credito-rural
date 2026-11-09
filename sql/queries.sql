@@ -50,7 +50,8 @@ ORDER BY reference_year;
 -- name: state_ranking
 -- Question 2: which states receive the most?
 -- Parameters: :first_year, :last_year (required); :activity_code, :purpose (optional).
--- One row per UF, ordered by the real amount of the period (comparable across years).
+-- One row per UF. Position and share follow the conventions: nominal values when the
+-- period is a single year, real values when it adds several years.
 WITH by_state AS (
     SELECT
         state_abbr,
@@ -63,16 +64,23 @@ WITH by_state AS (
       AND (CAST(:activity_code AS CHAR(1)) IS NULL OR activity_code = CAST(:activity_code AS CHAR(1)))
       AND (CAST(:purpose AS TEXT) IS NULL OR purpose = CAST(:purpose AS TEXT))
     GROUP BY state_abbr, region_name
+),
+based AS (
+    SELECT
+        by_state.*,
+        CASE WHEN CAST(:first_year AS SMALLINT) = CAST(:last_year AS SMALLINT)
+             THEN amount_nominal ELSE amount_real END AS amount_base
+    FROM by_state
 )
 SELECT
-    RANK() OVER (ORDER BY amount_real DESC) AS position,
+    RANK() OVER (ORDER BY amount_base DESC) AS position,
     state_abbr,
     region_name,
     ROUND(amount_nominal, 2) AS amount_nominal,
     ROUND(amount_real, 2)    AS amount_real,
     contracts,
-    ROUND(100 * amount_real / NULLIF(SUM(amount_real) OVER (), 0), 2) AS share_pct
-FROM by_state
+    ROUND(100 * amount_base / NULLIF(SUM(amount_base) OVER (), 0), 2) AS share_pct
+FROM based
 ORDER BY position, state_abbr;
 
 
@@ -256,8 +264,9 @@ ORDER BY reference_year, region_name;
 -- name: program_ranking
 -- Question 8: which programs concentrate the credit?
 -- Parameters: :first_year, :last_year (required); :state_abbr (optional).
--- One row per program, ordered by the real amount of the period. Names as published
--- by the source; grouping the smaller ones into "Outros" is a presentation choice of the site.
+-- One row per program; position and share as in state_ranking (nominal for a single
+-- year, real for several). Names as published by the source; grouping the smaller ones
+-- into "Outros" is a presentation choice of the site.
 WITH by_program AS (
     SELECT
         program_name,
@@ -268,22 +277,30 @@ WITH by_program AS (
     WHERE reference_year BETWEEN :first_year AND :last_year
       AND (CAST(:state_abbr AS CHAR(2)) IS NULL OR state_abbr = CAST(:state_abbr AS CHAR(2)))
     GROUP BY program_name
+),
+based AS (
+    SELECT
+        by_program.*,
+        CASE WHEN CAST(:first_year AS SMALLINT) = CAST(:last_year AS SMALLINT)
+             THEN amount_nominal ELSE amount_real END AS amount_base
+    FROM by_program
 )
 SELECT
-    RANK() OVER (ORDER BY amount_real DESC) AS position,
+    RANK() OVER (ORDER BY amount_base DESC) AS position,
     program_name,
     ROUND(amount_nominal, 2) AS amount_nominal,
     ROUND(amount_real, 2)    AS amount_real,
     contracts,
-    ROUND(100 * amount_real / NULLIF(SUM(amount_real) OVER (), 0), 2) AS share_pct
-FROM by_program
+    ROUND(100 * amount_base / NULLIF(SUM(amount_base) OVER (), 0), 2) AS share_pct
+FROM based
 ORDER BY position, program_name;
 
 
 -- name: funding_source_ranking
 -- Question 9: where do the resources come from?
 -- Parameters: :first_year, :last_year (required); :state_abbr (optional).
--- One row per funding source, ordered by the real amount of the period.
+-- One row per funding source; position and share as in state_ranking (nominal for a
+-- single year, real for several).
 WITH by_source AS (
     SELECT
         funding_source_name,
@@ -294,15 +311,22 @@ WITH by_source AS (
     WHERE reference_year BETWEEN :first_year AND :last_year
       AND (CAST(:state_abbr AS CHAR(2)) IS NULL OR state_abbr = CAST(:state_abbr AS CHAR(2)))
     GROUP BY funding_source_name
+),
+based AS (
+    SELECT
+        by_source.*,
+        CASE WHEN CAST(:first_year AS SMALLINT) = CAST(:last_year AS SMALLINT)
+             THEN amount_nominal ELSE amount_real END AS amount_base
+    FROM by_source
 )
 SELECT
-    RANK() OVER (ORDER BY amount_real DESC) AS position,
+    RANK() OVER (ORDER BY amount_base DESC) AS position,
     funding_source_name,
     ROUND(amount_nominal, 2) AS amount_nominal,
     ROUND(amount_real, 2)    AS amount_real,
     contracts,
-    ROUND(100 * amount_real / NULLIF(SUM(amount_real) OVER (), 0), 2) AS share_pct
-FROM by_source
+    ROUND(100 * amount_base / NULLIF(SUM(amount_base) OVER (), 0), 2) AS share_pct
+FROM based
 ORDER BY position, funding_source_name;
 
 

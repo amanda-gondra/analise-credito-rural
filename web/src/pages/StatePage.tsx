@@ -19,7 +19,7 @@ import { buttonClass } from "../components/ui/controls";
 import { EmptyState, QueryView, Skeleton } from "../components/ui/feedback";
 import { Icon } from "../components/ui/Icon";
 import { REGION_LABEL, ufInfo } from "../lib/domain";
-import { apiParams, useFilters } from "../lib/filters";
+import { BASIS_TEXT, amountBasis, apiParams, useFilters } from "../lib/filters";
 import { formatCount, formatMoney, formatPercent, formatPeriod } from "../lib/format";
 import NotFoundPage from "./NotFoundPage";
 
@@ -40,6 +40,7 @@ export default function StatePage() {
 
   if (!info) return <NotFoundPage />;
   const range = formatPeriod(filters.startYear, filters.endYear);
+  const basis = amountBasis(filters);
   const periodSearch = `?start_year=${filters.startYear}&end_year=${filters.endYear}`;
 
   return (
@@ -59,7 +60,11 @@ export default function StatePage() {
         ) : profile.data?.data.ranking ? (
           <dl className="grid grid-cols-1 gap-3 min-[22.5rem]:grid-cols-2 lg:grid-cols-4" aria-label={`Indicadores de ${info.name} em ${range}`}>
             <Kpi label="Posição entre as UFs" value={`${profile.data.data.ranking.position}º`} detail={`em ${range}`} />
-            <Kpi label="Valor corrigido" value={formatMoney(profile.data.data.ranking.amount_real)} detail="preços de dez/2025" />
+            {basis === "nominal" ? (
+              <Kpi label="Valor concedido" value={formatMoney(profile.data.data.ranking.amount_nominal)} detail="valor nominal" />
+            ) : (
+              <Kpi label="Valor corrigido" value={formatMoney(profile.data.data.ranking.amount_real)} detail="preços de dez/2025" />
+            )}
             <Kpi label="Participação no Brasil" value={formatPercent(profile.data.data.ranking.share_pct)} detail={`total de ${range}`} />
             <Kpi label="Contratos" value={formatCount(profile.data.data.ranking.contracts)} detail={`em ${range}`} />
           </dl>
@@ -112,13 +117,14 @@ export default function StatePage() {
         </div>
 
         <div className="grid gap-6 xl:grid-cols-2">
-          <Card id="programas" title="Programas" scope={`${scopeText(filters, [], [info.uf])} · valores corrigidos`}>
+          <Card id="programas" title="Programas" scope={`${scopeText(filters, [], [info.uf])} · ${BASIS_TEXT[basis]}`}>
             <QueryView query={programs} skeleton="h-80">
               {(body) =>
                 body.data.length ? (
                   <RankTable
                     caption={`Programas de crédito rural em ${info.name}`}
                     nameHeader="Programa"
+                    basis={basis}
                     rows={body.data.map((row) => ({ ...row, name: row.program }))}
                   />
                 ) : (
@@ -127,13 +133,14 @@ export default function StatePage() {
               }
             </QueryView>
           </Card>
-          <Card id="fontes" title="Fontes de recursos" scope={`${scopeText(filters, [], [info.uf])} · valores corrigidos`}>
+          <Card id="fontes" title="Fontes de recursos" scope={`${scopeText(filters, [], [info.uf])} · ${BASIS_TEXT[basis]}`}>
             <QueryView query={sources} skeleton="h-80">
               {(body) =>
                 body.data.length ? (
                   <RankTable
                     caption={`Fontes de recursos do crédito rural em ${info.name}`}
                     nameHeader="Fonte de recursos"
+                    basis={basis}
                     rows={body.data.map((row) => ({ ...row, name: row.funding_source }))}
                   />
                 ) : (

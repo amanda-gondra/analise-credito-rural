@@ -7,7 +7,7 @@ import { Link } from "react-router";
 
 import type { StateRank } from "../../api/types";
 import { ACTIVITY_LABEL, type Activity, REGION_LABEL, ufName } from "../../lib/domain";
-import { type Filters, readUf, useParam } from "../../lib/filters";
+import { type Filters, amountBasis, readUf, useParam } from "../../lib/filters";
 import { formatCount, formatMoney, formatPercent, formatPeriod } from "../../lib/format";
 import { Icon } from "../ui/Icon";
 import { BrazilMap, type Ramp } from "./BrazilMap";
@@ -27,14 +27,19 @@ export function TerritoryView({ rows, filters }: { rows: StateRank[]; filters: F
   const period = formatPeriod(filters.startYear, filters.endYear);
   const subject = filters.activity ? ACTIVITY_LABEL[filters.activity].toLowerCase() : "crédito rural";
   const chosen = selected ? byUf.get(selected) : undefined;
+  // The amount the API ranked by (amountBasis): granted (nominal) inside one year; for several
+  // years only the corrected sum, because nominal amounts of different years do not add up.
+  const singleYear = amountBasis(filters) === "nominal";
+  const mainLabel = singleYear ? "Valor concedido" : "Valor corrigido";
+  const mainAmount = (row: StateRank) => (singleYear ? row.amount_nominal : row.amount_real);
 
   const describe = (uf: string) => {
     const row = byUf.get(uf);
     if (!row) return <p className="text-ink-2">Sem registros no período.</p>;
     return (
       <dl className="mt-1 grid grid-cols-[auto_auto] gap-x-3 gap-y-0.5 text-ink-2">
-        <dt>Valor corrigido</dt>
-        <dd className="tabular text-right font-medium text-ink">{formatMoney(row.amount_real)}</dd>
+        <dt>{mainLabel}</dt>
+        <dd className="tabular text-right font-medium text-ink">{formatMoney(mainAmount(row))}</dd>
         <dt>Participação</dt>
         <dd className="tabular text-right font-medium text-ink">{formatPercent(row.share_pct)}</dd>
         <dt>Posição</dt>
@@ -86,17 +91,19 @@ export function TerritoryView({ rows, filters }: { rows: StateRank[]; filters: F
             </div>
             <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
               <div>
-                <dt className="text-ink-2">Valor corrigido</dt>
-                <dd className="tabular text-base font-semibold text-ink">{formatMoney(chosen.amount_real)}</dd>
+                <dt className="text-ink-2">{mainLabel}</dt>
+                <dd className="tabular text-base font-semibold text-ink">{formatMoney(mainAmount(chosen))}</dd>
               </div>
               <div>
                 <dt className="text-ink-2">Participação</dt>
                 <dd className="tabular text-base font-semibold text-ink">{formatPercent(chosen.share_pct)}</dd>
               </div>
-              <div>
-                <dt className="text-ink-2">Valor nominal</dt>
-                <dd className="tabular text-ink">{formatMoney(chosen.amount_nominal)}</dd>
-              </div>
+              {singleYear && (
+                <div>
+                  <dt className="text-ink-2">Corrigido (dez/2025)</dt>
+                  <dd className="tabular text-ink">{formatMoney(chosen.amount_real)}</dd>
+                </div>
+              )}
               <div>
                 <dt className="text-ink-2">Contratos</dt>
                 <dd className="tabular text-ink">{formatCount(chosen.contracts)}</dd>

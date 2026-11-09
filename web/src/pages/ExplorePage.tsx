@@ -12,7 +12,7 @@ import { Button, Select, buttonClass } from "../components/ui/controls";
 import { EmptyState, ErrorState, Notice, Skeleton } from "../components/ui/feedback";
 import { Icon } from "../components/ui/Icon";
 import { REGIONS, REGION_LABEL, type Region, UFS, ufName } from "../lib/domain";
-import { apiParams, readRegion, readUf, useFilters } from "../lib/filters";
+import { BASIS_TEXT, amountBasis, apiParams, readRegion, readUf, useFilters } from "../lib/filters";
 import { formatCount, formatInteger, formatMoney } from "../lib/format";
 
 const PAGE_SIZES = ["25", "50", "100"] as const;
@@ -137,6 +137,7 @@ export default function ExplorePage() {
   const sources = useFundingSources(rankingParams);
   const average = useAverageContract(params);
   const periodRow = average.data?.data.find((row) => row.year === null);
+  const basis = amountBasis(filters);
 
   const placeValue = place.state ? `uf:${place.state}` : place.region ? `regiao:${place.region}` : "brasil";
   const placeOptions = [
@@ -203,31 +204,34 @@ export default function ExplorePage() {
         {periodRow && periodRow.contracts > 0 && (
           <p className="text-sm text-ink-2">
             Valor médio por contrato no recorte: <span className="text-base font-semibold text-ink tabular">{formatMoney(periodRow.average_real)}</span>{" "}
-            (corrigido) e {formatMoney(periodRow.average_nominal)} (nominal).
+            {basis === "nominal"
+              ? `(corrigido) e ${formatMoney(periodRow.average_nominal)} (nominal).`
+              : "(corrigido para dezembro de 2025)."}
           </p>
         )}
 
         <Rows params={params} signature={signature} />
 
         <div className="grid gap-6 xl:grid-cols-2">
-          <Card id="programas" title="Programas" scope={`${rankingScope} · valores corrigidos${place.region ? " (Brasil: o ranking não filtra região)" : ""}`}>
+          <Card id="programas" title="Programas" scope={`${rankingScope} · ${BASIS_TEXT[basis]}${place.region ? " (Brasil: o ranking não filtra região)" : ""}`}>
             {programs.isPending ? (
               <Skeleton className="h-80" />
             ) : programs.data?.data.length ? (
-              <RankTable caption="Programas por valor no período" nameHeader="Programa" rows={programs.data.data.map((row) => ({ ...row, name: row.program }))} />
+              <RankTable caption="Programas por valor no período" nameHeader="Programa" basis={basis} rows={programs.data.data.map((row) => ({ ...row, name: row.program }))} />
             ) : programs.error ? (
               <ErrorState error={programs.error} onRetry={() => programs.refetch()} />
             ) : (
               <EmptyState>Sem registros no período.</EmptyState>
             )}
           </Card>
-          <Card id="fontes" title="Fontes de recursos" scope={`${rankingScope} · valores corrigidos${place.region ? " (Brasil: o ranking não filtra região)" : ""}`}>
+          <Card id="fontes" title="Fontes de recursos" scope={`${rankingScope} · ${BASIS_TEXT[basis]}${place.region ? " (Brasil: o ranking não filtra região)" : ""}`}>
             {sources.isPending ? (
               <Skeleton className="h-80" />
             ) : sources.data?.data.length ? (
               <RankTable
                 caption="Fontes de recursos por valor no período"
                 nameHeader="Fonte de recursos"
+                basis={basis}
                 rows={sources.data.data.map((row) => ({ ...row, name: row.funding_source }))}
               />
             ) : sources.error ? (

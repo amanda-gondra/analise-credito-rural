@@ -9,7 +9,7 @@ import { TerritoryView } from "../components/map/TerritoryCard";
 import { Card, Kpi } from "../components/ui/Card";
 import { Segmented } from "../components/ui/controls";
 import { QueryView, Skeleton } from "../components/ui/feedback";
-import { apiParams, useFilters } from "../lib/filters";
+import { BASIS_TEXT, amountBasis, apiParams, useFilters } from "../lib/filters";
 import { formatCount, formatMoney, formatPercent } from "../lib/format";
 
 function Indicators() {
@@ -122,7 +122,7 @@ export default function OverviewPage() {
       <div className="flex flex-col gap-6">
         <Indicators />
 
-        <Card id="mapa" title="Distribuição por estado" scope={`${scopeText(filters, ["activity", "purpose"])} · valores corrigidos`}>
+        <Card id="mapa" title="Distribuição por estado" scope={`${scopeText(filters, ["activity", "purpose"])} · ${BASIS_TEXT[amountBasis(filters)]}`}>
           <QueryView query={ranking} skeleton="h-[28rem]">
             {(body) => <TerritoryView rows={body.data} filters={filters} />}
           </QueryView>

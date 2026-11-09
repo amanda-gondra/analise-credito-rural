@@ -163,6 +163,37 @@ def test_rankings_add_up_to_the_national_total(run, national_real, query):
     assert close(sum(r["share_pct"] for r in rows), Decimal(100), Decimal("0.5"))
 
 
+# query -> (grouping column, filters of the query)
+RANKINGS = {
+    "state_ranking": ("state_abbr", {"activity_code": None, "purpose": None}),
+    "program_ranking": ("program_name", {"state_abbr": None}),
+    "funding_source_ranking": ("funding_source_name", {"state_abbr": None}),
+}
+
+
+def _shares(engine, column: str, amount: str, first: int, last: int) -> dict:
+    """Shares computed independently, with the same rounding. Column names come from RANKINGS."""
+    sql = text(
+        f"SELECT {column}, ROUND(100 * SUM({amount}) / SUM(SUM({amount})) OVER (), 2) "
+        f"FROM credit_monthly_adjusted WHERE reference_year BETWEEN :a AND :b GROUP BY {column}"
+    )
+    with engine.connect() as c:
+        return dict(c.execute(sql, {"a": first, "b": last}).all())
+
+
+@pytest.mark.parametrize("query", RANKINGS)
+def test_rankings_use_nominal_values_inside_one_year_and_real_values_across_years(engine, run, query):
+    column, filters = RANKINGS[query]
+    # 2025: the year where the two bases differ in the second decimal for some UFs (measured 09/11/2026)
+    one_year = run(query, first_year=LAST, last_year=LAST, **filters)
+    assert {r[column]: r["share_pct"] for r in one_year} == _shares(engine, column, "credit_amount", LAST, LAST)
+    assert [r["amount_nominal"] for r in one_year] == sorted((r["amount_nominal"] for r in one_year), reverse=True)
+
+    several = run(query, **PERIOD, **filters)
+    assert {r[column]: r["share_pct"] for r in several} == _shares(engine, column, "credit_amount_real", FIRST, LAST)
+    assert [r["amount_real"] for r in several] == sorted((r["amount_real"] for r in several), reverse=True)
+
+
 # --- question 10 -----------------------------------------------------------------------------
 
 @pytest.mark.parametrize("purpose", [None, "custeio"])

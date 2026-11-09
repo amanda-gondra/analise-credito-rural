@@ -159,3 +159,19 @@ export function readRegion(value: string | null): Region | null {
   const lower = value?.toLowerCase() ?? null;
   return isRegion(lower) ? lower : null;
 }
+
+/**
+ * Which amount stands for a period, by the conventions of the queries (sql/queries.sql): inside
+ * one year the amount granted (nominal); a sum of several years only at the prices of one date
+ * (corrected to December 2025). Rankings of the API order and compute shares the same way.
+ */
+export type AmountBasis = "nominal" | "real";
+
+export function amountBasis(filters: Pick<Filters, "startYear" | "endYear">): AmountBasis {
+  return filters.startYear === filters.endYear ? "nominal" : "real";
+}
+
+export const BASIS_TEXT: Record<AmountBasis, string> = {
+  nominal: "valores nominais",
+  real: "valores corrigidos",
+};

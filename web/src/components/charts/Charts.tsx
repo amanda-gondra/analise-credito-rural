@@ -225,7 +225,12 @@ export function AverageChart({ rows, caption }: { rows: AverageContract[]; capti
         columns: [
           { header: "Ano", cell: (row) => row.year ?? "Período" },
           { header: "Médio corrigido", cell: (row) => formatMoneyFull(row.average_real), numeric: true },
-          { header: "Médio nominal", cell: (row) => formatMoneyFull(row.average_nominal), numeric: true },
+          {
+            header: "Médio nominal",
+            // The period row adds several years: a nominal average would mix price levels.
+            cell: (row) => (row.year === null && years.length > 1 ? "—" : formatMoneyFull(row.average_nominal)),
+            numeric: true,
+          },
           { header: "Contratos", cell: (row) => row.contracts.toLocaleString("pt-BR"), numeric: true },
         ],
       }}

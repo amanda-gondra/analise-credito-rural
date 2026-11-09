@@ -1,23 +1,42 @@
 /**
  * Ranking of names (programs, funding sources) with amount and share. A table on wide
  * screens; on a phone each row stacks the name over its numbers, so nothing is cut or shrunk.
+ * The amount shown is the one the API ranked by (amountBasis): nominal for one year, corrected
+ * for several, so the amount and the share always speak of the same values.
  */
 import { useState } from "react";
 
+import type { AmountBasis } from "../../lib/filters";
 import { formatMoney, formatPercent } from "../../lib/format";
 
 export interface RankRow {
   position: number;
   name: string;
+  amount_nominal: number | null;
   amount_real: number | null;
   share_pct: number | null;
   contracts: number;
 }
 
-export function RankTable({ rows, caption, nameHeader, initial = 10 }: { rows: RankRow[]; caption: string; nameHeader: string; initial?: number }) {
+const AMOUNT_HEADER: Record<AmountBasis, string> = { nominal: "Valor concedido", real: "Valor corrigido" };
+
+export function RankTable({
+  rows,
+  caption,
+  nameHeader,
+  basis,
+  initial = 10,
+}: {
+  rows: RankRow[];
+  caption: string;
+  nameHeader: string;
+  basis: AmountBasis;
+  initial?: number;
+}) {
   const [expanded, setExpanded] = useState(false);
   const visible = expanded ? rows : rows.slice(0, initial);
   const max = Math.max(...rows.map((row) => row.share_pct ?? 0), 0);
+  const amountHeader = AMOUNT_HEADER[basis];
   return (
     <div>
       <table className="w-full border-collapse text-sm">
@@ -31,7 +50,7 @@ export function RankTable({ rows, caption, nameHeader, initial = 10 }: { rows: R
               {nameHeader}
             </th>
             <th scope="col" className="py-2 pr-3 text-right font-medium">
-              Valor corrigido
+              {amountHeader}
             </th>
             <th scope="col" className="py-2 text-right font-medium">
               Participação
@@ -49,8 +68,8 @@ export function RankTable({ rows, caption, nameHeader, initial = 10 }: { rows: R
                 </span>
               </td>
               <td className="col-start-2 tabular text-ink-2 sm:py-2.5 sm:pr-3 sm:text-right sm:text-ink">
-                <span className="sm:hidden">Valor corrigido: </span>
-                {formatMoney(row.amount_real)}
+                <span className="sm:hidden">{amountHeader}: </span>
+                {formatMoney(basis === "nominal" ? row.amount_nominal : row.amount_real)}
               </td>
               <td className="col-start-3 row-start-1 tabular text-right font-medium text-ink sm:py-2.5">{formatPercent(row.share_pct)}</td>
             </tr>

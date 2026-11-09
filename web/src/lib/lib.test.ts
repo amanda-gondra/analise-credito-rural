@@ -2,7 +2,17 @@ import { describe, expect, it } from "vitest";
 
 import shapes from "../data/uf-shapes.json";
 import { MATOPIBA, UFS, ufInfo } from "./domain";
-import { DEFAULT_FILTERS, apiParams, changedFilters, compareTab, readFilters, readRegion, readUfList, writeFilters } from "./filters";
+import {
+  DEFAULT_FILTERS,
+  amountBasis,
+  apiParams,
+  changedFilters,
+  compareTab,
+  readFilters,
+  readRegion,
+  readUfList,
+  writeFilters,
+} from "./filters";
 import { formatCount, formatDate, formatMoney, formatMoneyFull, formatMoneyTick, formatPercent, formatPeriod } from "./format";
 import { CATEGORY, MAP_RAMP } from "./palette";
 import { niceTicks, spreadLabels } from "./scale";
@@ -81,6 +91,12 @@ describe("filters in the URL", () => {
     expect(compareTab(new URLSearchParams("states=PI,MA"))).toBe("estados");
     expect(compareTab(new URLSearchParams("aba=regioes&states=PI"))).toBe("regioes");
     expect(compareTab(new URLSearchParams(""))).toBe("regioes");
+  });
+
+  it("shows nominal amounts inside one year and corrected sums across years, as the API ranks", () => {
+    expect(amountBasis({ startYear: 2025, endYear: 2025 })).toBe("nominal");
+    expect(amountBasis({ startYear: 2024, endYear: 2025 })).toBe("real");
+    expect(amountBasis(DEFAULT_FILTERS)).toBe("real");
   });
 });
 
