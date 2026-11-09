@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import { useActivities, useAverageContract, usePurposes, useSeasonality, useStateRanking, useYearlyTotals } from "../api/queries";
 import { AverageChart, SeasonalityChart, ShareStackChart, TrendChart } from "../components/charts/Charts";
+import { activityReading, averageReading, purposeReading, seasonalityReading, trendReading } from "../components/charts/readings";
 import { ACTIVITY_SERIES, PURPOSE_SERIES, activityRows, purposeRows } from "../components/charts/series";
 import { FilterBar } from "../components/filters/FilterBar";
 import { PageHeader, scopeText } from "../components/layout/PageHeader";
@@ -10,7 +11,7 @@ import { Card, Kpi } from "../components/ui/Card";
 import { Segmented } from "../components/ui/controls";
 import { QueryView, Skeleton } from "../components/ui/feedback";
 import { BASIS_TEXT, amountBasis, apiParams, useFilters } from "../lib/filters";
-import { formatCount, formatMoney, formatPercent } from "../lib/format";
+import { formatCount, formatMoney, formatPercent, formatPeriod } from "../lib/format";
 
 function Indicators() {
   const { filters } = useFilters();
@@ -61,6 +62,15 @@ function Distribution() {
         view === "activity"
           ? `${scopeText(filters, [])} · participação no total de cada ano`
           : `${scopeText(filters, ["activity"])} · participação no total de cada ano`
+      }
+      reading={
+        view === "activity"
+          ? activities.data
+            ? activityReading(activities.data.data, filters.endYear)
+            : null
+          : purposes.data
+            ? purposeReading(purposes.data.data, filters.endYear)
+            : null
       }
       actions={
         <Segmented
@@ -128,20 +138,32 @@ export default function OverviewPage() {
           </QueryView>
         </Card>
 
-        <Card id="evolucao" title="Evolução do crédito rural" scope={scopeText(filters, ["activity", "purpose"])}>
-          <QueryView query={totals}>
-            {(body) => (
-              <TrendChart
-                rows={body.data}
-                caption="Crédito rural por ano, em valores nominais e corrigidos para dezembro de 2025."
-              />
-            )}
-          </QueryView>
-        </Card>
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+          <Card
+            id="evolucao"
+            title="Evolução do crédito rural"
+            scope={`${scopeText(filters, ["activity", "purpose"])} · R$ por ano`}
+            reading={totals.data ? trendReading(totals.data.data, filters.endYear) : null}
+          >
+            <QueryView query={totals}>
+              {(body) => (
+                <TrendChart
+                  rows={body.data}
+                  caption="Crédito rural por ano, em valores nominais e corrigidos para dezembro de 2025."
+                />
+              )}
+            </QueryView>
+          </Card>
+          <Distribution />
+        </div>
 
         <div className="grid gap-6 xl:grid-cols-2">
-          <Distribution />
-          <Card id="sazonalidade" title="Em que meses o crédito é contratado" scope={scopeText(filters, ["purpose"])}>
+          <Card
+            id="sazonalidade"
+            title="Em que meses o crédito é contratado"
+            scope={`${scopeText(filters, ["purpose"])} · parte do crédito do ano`}
+            reading={seasonality.data ? seasonalityReading(seasonality.data.data, formatPeriod(filters.startYear, filters.endYear)) : null}
+          >
             <QueryView query={seasonality}>
               {(body) => (
                 <SeasonalityChart
@@ -151,26 +173,17 @@ export default function OverviewPage() {
               )}
             </QueryView>
           </Card>
+          <Card
+            id="valor-medio"
+            title="Valor médio por contrato"
+            scope={`${scopeText(filters, ["activity", "purpose"])} · em preços de dez/2025`}
+            reading={average.data ? averageReading(average.data.data, formatPeriod(filters.startYear, filters.endYear)) : null}
+          >
+            <QueryView query={average}>
+              {(body) => <AverageChart rows={body.data} caption="Valor médio por contrato em cada ano, em preços de dezembro de 2025." />}
+            </QueryView>
+          </Card>
         </div>
-
-        <Card id="valor-medio" title="Valor médio por contrato" scope={`${scopeText(filters, ["activity", "purpose"])} · valores corrigidos`}>
-          <QueryView query={average}>
-            {(body) => {
-              const period = body.data.find((row) => row.year === null);
-              return (
-                <>
-                  {period && (
-                    <p className="mb-4 text-sm text-ink-2">
-                      No período: <span className="text-lg font-semibold text-ink tabular">{formatMoney(period.average_real)}</span> por
-                      contrato, em {period.contracts.toLocaleString("pt-BR")} contratos.
-                    </p>
-                  )}
-                  <AverageChart rows={body.data} caption="Valor médio por contrato em cada ano, em preços de dezembro de 2025." />
-                </>
-              );
-            }}
-          </QueryView>
-        </Card>
       </div>
     </>
   );

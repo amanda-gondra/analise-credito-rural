@@ -4,17 +4,31 @@ import { ACTIVITY_LABEL, PURPOSE_LABEL } from "../../lib/domain";
 import type { FilterKey, Filters } from "../../lib/filters";
 import { formatPeriod } from "../../lib/format";
 
-export function PageHeader({ eyebrow, title, children }: { eyebrow?: string; title: string; children?: ReactNode }) {
+export function PageHeader({
+  eyebrow,
+  title,
+  children,
+  aside,
+}: {
+  eyebrow?: string;
+  title: string;
+  children?: ReactNode;
+  /** Shown beside the title on wide screens and below it on phones (a locator map, say). */
+  aside?: ReactNode;
+}) {
   return (
-    <div className="mb-6 max-w-3xl">
-      {eyebrow && (
-        <p className="mb-2 inline-flex items-center gap-2 rounded-full bg-forest-100 px-3 py-1 text-sm font-medium text-forest">
-          <span aria-hidden="true" className="size-1.5 rounded-full bg-leaf" />
-          {eyebrow}
-        </p>
-      )}
-      <h1 className="text-balance text-2xl font-bold tracking-tight text-ink sm:text-3xl lg:text-4xl">{title}</h1>
-      {children && <div className="mt-3 text-pretty text-base leading-relaxed text-ink-2">{children}</div>}
+    <div className="mb-6 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+      <div className="max-w-3xl">
+        {eyebrow && (
+          <p className="mb-2 inline-flex items-center gap-2 rounded-full bg-forest-100 px-3 py-1 text-sm font-medium text-forest">
+            <span aria-hidden="true" className="size-1.5 rounded-full bg-leaf" />
+            {eyebrow}
+          </p>
+        )}
+        <h1 className="text-balance text-2xl font-bold tracking-tight text-ink sm:text-3xl lg:text-4xl">{title}</h1>
+        {children && <div className="mt-3 text-pretty text-base leading-relaxed text-ink-2">{children}</div>}
+      </div>
+      {aside && <div className="shrink-0">{aside}</div>}
     </div>
   );
 }

@@ -1,47 +1,19 @@
 import { useMatopiba } from "../api/queries";
 import type { MatopibaYear } from "../api/types";
 import { MultiLineChart } from "../components/charts/Charts";
-import { pivot } from "../components/charts/series";
+import { matopibaReading } from "../components/charts/readings";
+import { pivot, pivotWith } from "../components/charts/series";
 import { FilterBar } from "../components/filters/FilterBar";
 import { PageHeader, scopeText } from "../components/layout/PageHeader";
+import { Locator } from "../components/map/Locator";
 import { Card, Kpi } from "../components/ui/Card";
 import { Notice, QueryView, Skeleton } from "../components/ui/feedback";
-import shapes from "../data/uf-shapes.json";
 import { MATOPIBA, ufName } from "../lib/domain";
 import { apiParams, useFilters } from "../lib/filters";
 import { formatCount, formatMoney, formatMoneyTick, formatPercent } from "../lib/format";
 import { CATEGORY, SERIES_COLOR } from "../lib/palette";
 
 const BLOC = "MATOPIBA";
-
-/** Brazil with the four states of the bloc highlighted (a locator, not data). */
-function Locator() {
-  const [x, y, w, h] = shapes.viewBox;
-  return (
-    <svg viewBox={`${x} ${y} ${w} ${h}`} role="img" aria-label="Mapa do Brasil com Maranhão, Tocantins, Piauí e Bahia destacados" className="mx-auto block h-auto w-full max-w-[16rem]">
-      {shapes.ufs.map((item) => {
-        const inBloc = (MATOPIBA as readonly string[]).includes(item.uf);
-        return (
-          <path
-            key={item.uf}
-            d={item.d}
-            fill={inBloc ? SERIES_COLOR.real : "#e4e9e3"}
-            stroke="#ffffff"
-            strokeWidth={1}
-            vectorEffect="non-scaling-stroke"
-          />
-        );
-      })}
-      {shapes.ufs
-        .filter((item) => (MATOPIBA as readonly string[]).includes(item.uf))
-        .map((item) => (
-          <text key={item.uf} x={item.cx} y={item.cy} textAnchor="middle" dominantBaseline="central" fontSize={16} fontWeight={700} fill="#ffffff" aria-hidden="true">
-            {item.uf}
-          </text>
-        ))}
-    </svg>
-  );
-}
 
 export default function MatopibaPage() {
   const { filters } = useFilters();
@@ -73,7 +45,12 @@ export default function MatopibaPage() {
             </dl>
           )}
           <div className="row-span-2 rounded-2xl border border-line bg-surface p-4 shadow-card">
-            <Locator />
+            <Locator
+              ufs={MATOPIBA}
+              named
+              label="Mapa do Brasil com Maranhão, Tocantins, Piauí e Bahia destacados"
+              className="mx-auto block h-auto w-full max-w-[16rem]"
+            />
           </div>
           <Notice>
             O painel considera os quatro estados inteiros. A delimitação oficial da Embrapa reúne 337 municípios desses estados,
@@ -81,7 +58,12 @@ export default function MatopibaPage() {
           </Notice>
         </div>
 
-        <Card id="participacao" title="Participação no crédito rural do Brasil" scope={`${scopeText(filters, [])} · valores nominais de cada ano`}>
+        <Card
+          id="participacao"
+          title="Participação no crédito rural do Brasil"
+          scope={`${scopeText(filters, [])} · % do total do Brasil, valores nominais de cada ano`}
+          reading={matopiba.data ? matopibaReading(matopiba.data.data, end) : null}
+        >
           <QueryView query={matopiba}>
             {(body) => (
               <MultiLineChart
@@ -89,20 +71,31 @@ export default function MatopibaPage() {
                 series={[{ key: BLOC, label: "MATOPIBA (quatro estados)", short: "Bloco", color: SERIES_COLOR.real }, ...series]}
                 format={(value) => formatPercent(value)}
                 tickFormat={(value) => `${value.toLocaleString("pt-BR")}%`}
+                endFormat={(value) => formatPercent(value)}
                 caption="Participação do MATOPIBA e de cada um dos seus estados no crédito rural do Brasil, ano a ano."
               />
             )}
           </QueryView>
         </Card>
 
-        <Card id="estados" title="Crédito por estado do MATOPIBA" scope={`${scopeText(filters, [])} · valores corrigidos`}>
+        <Card id="estados" title="Crédito por estado do MATOPIBA" scope={`${scopeText(filters, [])} · R$ por ano, em preços de dez/2025`}>
           <QueryView query={matopiba}>
             {(body) => (
               <MultiLineChart
-                rows={pivot(body.data.filter((row) => row.state !== null), (row) => row.state ?? "", (row) => row.amount_real)}
+                rows={pivotWith(
+                  body.data.filter((row) => row.state !== null),
+                  (row) => row.state ?? "",
+                  (row) => row.amount_real,
+                  (row) => row.share_of_brazil_pct,
+                  "share",
+                )}
                 series={series}
                 format={(value) => formatMoney(value)}
                 tickFormat={formatMoneyTick}
+                detail={(key, row) => {
+                  const share = row[`${key}__share`];
+                  return typeof share === "number" ? `${formatPercent(share)} do Brasil` : null;
+                }}
                 caption="Crédito rural de Maranhão, Tocantins, Piauí e Bahia por ano, em preços de dezembro de 2025."
               />
             )}

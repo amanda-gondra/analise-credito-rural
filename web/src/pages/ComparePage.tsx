@@ -1,18 +1,19 @@
 import { useSearchParams } from "react-router";
 
-import { useCompareStates, useRegionsYearly } from "../api/queries";
+import { useCompareStates, useRegionsYearly, useYearlyTotals } from "../api/queries";
 import type { RegionYear, StateYear } from "../api/types";
 import { MultiLineChart } from "../components/charts/Charts";
-import { pivot } from "../components/charts/series";
+import { regionAmountReading, regionShareReading, statesAmountReading, statesShareReading } from "../components/charts/readings";
+import { pivotWith } from "../components/charts/series";
 import { FilterBar, FilterChip } from "../components/filters/FilterBar";
 import { PageHeader, scopeText } from "../components/layout/PageHeader";
 import { Card } from "../components/ui/Card";
 import { Button, Segmented, Select } from "../components/ui/controls";
 import { EmptyState, QueryView } from "../components/ui/feedback";
-import { MATOPIBA, REGIONS, REGION_LABEL, UFS, ufName } from "../lib/domain";
+import { MATOPIBA, REGIONS, REGION_LABEL, type Region, UFS, ufName } from "../lib/domain";
 import { apiParams, compareTab, readUfList, useFilters } from "../lib/filters";
 import { formatMoney, formatMoneyTick, formatPercent } from "../lib/format";
-import { CATEGORY } from "../lib/palette";
+import { CATEGORY, REGION_COLOR } from "../lib/palette";
 
 const REGION_SHORT: Record<(typeof REGIONS)[number], string> = {
   norte: "N",
@@ -35,36 +36,96 @@ function percentTick(value: number) {
 
 function Regions() {
   const { filters } = useFilters();
-  const regions = useRegionsYearly(apiParams(filters, ["activity", "purpose"]));
-  const series = REGIONS.map((region, index) => ({ key: region, label: REGION_LABEL[region], short: REGION_SHORT[region], color: CATEGORY[index]! }));
+  const params = apiParams(filters, ["activity", "purpose"]);
+  const regions = useRegionsYearly(params);
+  const totals = useYearlyTotals(params);
+  const end = filters.endYear;
+  const series = REGIONS.map((region) => ({ key: region, label: REGION_LABEL[region], short: REGION_SHORT[region], color: REGION_COLOR[region] }));
+  const ofEnd = (regions.data?.data ?? []).filter((row) => row.year === end && row.share_pct !== null);
+  const brazil = totals.data?.data.find((row) => row.year === end);
+  const ranked = [...ofEnd].sort((a, b) => (b.share_pct ?? 0) - (a.share_pct ?? 0));
+  const first = ranked[0];
+  const lastRegion = ranked.at(-1);
   return (
     <div className="flex flex-col gap-6">
-      <Card id="regioes-valor" title="Crédito por região" scope={`${scopeText(filters, ["activity", "purpose"])} · valores corrigidos`}>
+      <Card
+        id="regioes-valor"
+        title="Crédito por região"
+        scope={`${scopeText(filters, ["activity", "purpose"])} · R$ por ano, em preços de dez/2025`}
+        reading={regions.data ? regionAmountReading(regions.data.data, end) : null}
+      >
         <QueryView query={regions}>
           {(body) => (
             <MultiLineChart
-              rows={pivot<RegionYear>(body.data, (row) => row.region, (row) => row.amount_real)}
+              rows={pivotWith<RegionYear>(body.data, (row) => row.region, (row) => row.amount_real, (row) => row.share_pct, "share")}
               series={series}
               format={(value) => formatMoney(value)}
               tickFormat={formatMoneyTick}
+              detail={(key, row) => {
+                const share = row[`${key}__share`];
+                return typeof share === "number" ? `${formatPercent(share)} do ano` : null;
+              }}
               caption="Crédito rural de cada região por ano, em preços de dezembro de 2025."
             />
           )}
         </QueryView>
       </Card>
-      <Card id="regioes-participacao" title="Participação de cada região no ano" scope={scopeText(filters, ["activity", "purpose"])}>
+      <Card
+        id="regioes-participacao"
+        title="Participação de cada região no ano"
+        scope={`${scopeText(filters, ["activity", "purpose"])} · % do total do Brasil, valores nominais`}
+        reading={regions.data ? regionShareReading(regions.data.data, end) : null}
+      >
         <QueryView query={regions}>
           {(body) => (
             <MultiLineChart
-              rows={pivot<RegionYear>(body.data, (row) => row.region, (row) => row.share_pct)}
+              rows={pivotWith<RegionYear>(body.data, (row) => row.region, (row) => row.share_pct, (row) => row.amount_nominal, "amount")}
               series={series}
               format={(value) => formatPercent(value)}
               tickFormat={percentTick}
+              endFormat={(value) => formatPercent(value)}
+              detail={(key, row) => {
+                const amount = row[`${key}__amount`];
+                return typeof amount === "number" ? formatMoney(amount) : null;
+              }}
               caption="Participação de cada região no total de cada ano, em valores nominais."
             />
           )}
         </QueryView>
       </Card>
+      {first && lastRegion && (
+        <section aria-labelledby="destaques" className="rounded-2xl border border-line bg-forest-50/60 p-4 sm:p-6">
+          <h2 id="destaques" className="mb-4 text-base font-semibold text-ink sm:text-lg">
+            Destaques de {end}
+          </h2>
+          <dl className="grid gap-4 sm:grid-cols-3 sm:divide-x sm:divide-line">
+            <div className="sm:pr-4">
+              <dt className="text-sm text-ink-2">Crédito rural no Brasil</dt>
+              <dd className="mt-1 text-2xl font-semibold tracking-tight text-ink">{formatMoney(brazil?.amount_nominal)}</dd>
+              <dd className="mt-0.5 text-sm text-ink-2">
+                valor nominal
+                {typeof brazil?.change_real_pct === "number" && <>; {formatPercent(brazil.change_real_pct, { sign: true })} real sobre {end - 1}</>}
+              </dd>
+            </div>
+            <div className="sm:px-4">
+              <dt className="text-sm text-ink-2">Maior participação</dt>
+              <dd className="mt-1 flex items-center gap-2 text-2xl font-semibold tracking-tight text-ink">
+                <span aria-hidden="true" className="size-3 rounded-full" style={{ backgroundColor: REGION_COLOR[first.region as Region] }} />
+                {REGION_LABEL[first.region as Region]}
+              </dd>
+              <dd className="mt-0.5 text-sm text-ink-2">{formatPercent(first.share_pct)} do crédito do Brasil</dd>
+            </div>
+            <div className="sm:pl-4">
+              <dt className="text-sm text-ink-2">Menor participação</dt>
+              <dd className="mt-1 flex items-center gap-2 text-2xl font-semibold tracking-tight text-ink">
+                <span aria-hidden="true" className="size-3 rounded-full" style={{ backgroundColor: REGION_COLOR[lastRegion.region as Region] }} />
+                {REGION_LABEL[lastRegion.region as Region]}
+              </dd>
+              <dd className="mt-0.5 text-sm text-ink-2">{formatPercent(lastRegion.share_pct)} do crédito do Brasil</dd>
+            </div>
+          </dl>
+        </section>
+      )}
     </div>
   );
 }
@@ -116,27 +177,46 @@ function States({ states, setStates }: { states: string[]; setStates: (next: str
         <EmptyState>Escolha pelo menos dois estados para comparar.</EmptyState>
       ) : (
         <>
-          <Card id="estados-valor" title="Crédito por estado" scope={`${scopeText(filters, [])} · valores corrigidos`}>
+          <Card
+            id="estados-valor"
+            title="Crédito por estado"
+            scope={`${scopeText(filters, [])} · R$ por ano, em preços de dez/2025`}
+            reading={compare.data ? statesAmountReading(compare.data.data, filters.endYear) : null}
+          >
             <QueryView query={compare}>
               {(body) => (
                 <MultiLineChart
-                  rows={pivot<StateYear>(body.data, (row) => row.state, (row) => row.amount_real)}
+                  rows={pivotWith<StateYear>(body.data, (row) => row.state, (row) => row.amount_real, (row) => row.share_of_brazil_pct, "share")}
                   series={series}
                   format={(value) => formatMoney(value)}
                   tickFormat={formatMoneyTick}
+                  detail={(key, row) => {
+                    const share = row[`${key}__share`];
+                    return typeof share === "number" ? `${formatPercent(share)} do Brasil` : null;
+                  }}
                   caption={`Crédito rural por ano de ${states.map(ufName).join(", ")}, em preços de dezembro de 2025.`}
                 />
               )}
             </QueryView>
           </Card>
-          <Card id="estados-participacao" title="Participação no Brasil" scope={`${scopeText(filters, [])} · valores nominais de cada ano`}>
+          <Card
+            id="estados-participacao"
+            title="Participação no Brasil"
+            scope={`${scopeText(filters, [])} · % do total do Brasil, valores nominais de cada ano`}
+            reading={compare.data ? statesShareReading(compare.data.data, filters.endYear) : null}
+          >
             <QueryView query={compare}>
               {(body) => (
                 <MultiLineChart
-                  rows={pivot<StateYear>(body.data, (row) => row.state, (row) => row.share_of_brazil_pct)}
+                  rows={pivotWith<StateYear>(body.data, (row) => row.state, (row) => row.share_of_brazil_pct, (row) => row.amount_nominal, "amount")}
                   series={series}
                   format={(value) => formatPercent(value)}
                   tickFormat={percentTick}
+                  endFormat={(value) => formatPercent(value)}
+                  detail={(key, row) => {
+                    const amount = row[`${key}__amount`];
+                    return typeof amount === "number" ? formatMoney(amount) : null;
+                  }}
                   caption={`Participação de ${states.map(ufName).join(", ")} no crédito rural do Brasil em cada ano.`}
                 />
               )}
