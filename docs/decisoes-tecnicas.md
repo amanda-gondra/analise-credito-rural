@@ -157,12 +157,13 @@ Formato de cada registro: contexto, decisão, alternativas e justificativa. Hip�
 
 - **Logo:** a imagem oficial, só recortada nas margens brancas, com o fundo branco convertido em transparência (as cores e as proporções não mudam). Por isso o cabeçalho é branco: um cabeçalho escuro exigiria uma versão clara do logo, que seria redesenho. Favicon: o símbolo do próprio logo, recortado.
 - **Paleta de interface:** verde-floresta `#174B32` (ação principal, cabeçalho do assistente), azul-petróleo `#315B6B` (avisos informativos e pecuária), verde médio `#78A85A` só decorativo (contraste 2,78 no branco), fundo `#F7F8F4`, texto `#202923`, texto secundário `#5F6A63` (ajustado de `#69746D` para passar de 4,5:1 também sobre o fundo e as superfícies cinza). Sem roxo.
-- **Cores de dados:** agricultura `#4F7F2D` e pecuária `#315B6B` (diferença CIEDE2000 de 36,5 em deuteranopia); três rampas de seis classes com os mesmos passos de luminosidade OKLCH (total em verde-floresta, agricultura em verde-folha, pecuária em petróleo); paleta de categorias terracota, marrom, mostarda, grafite e vinho para finalidades, regiões e estados, nunca no mesmo gráfico que agricultura e pecuária, e sempre com o nome escrito na série. Validadas com o verificador de paletas e de contraste em 08/11/2026.
+- **Cores de dados:** agricultura `#4F7F2D` e pecuária `#315B6B` (diferença CIEDE2000 de 36,5 em deuteranopia); três rampas de seis classes com os mesmos passos de luminosidade OKLCH (total em verde-floresta, agricultura em verde-folha, pecuária em petróleo); paleta de categorias para finalidades, regiões e estados, nunca no mesmo gráfico que agricultura e pecuária. Validadas com o verificador de paletas e de contraste em 08/11/2026.
+- **Paleta de categorias (revista em 09/11/2026):** azul `#2B73A8`, laranja `#D9732C`, verde-água `#1F9A8A`, ocre `#B8860B` e rosa `#C4527A`, sempre nessa ordem (a cor segue a categoria, não a posição no ranking). Substitui a terracota, marrom, mostarda, grafite e vinho, que eram quase todos tons quentes e escuros, difíceis de separar entre si. Verificador de paletas: menor diferença entre cores vizinhas de 11,6 em daltonismo simulado e 18,5 em visão normal; todas com contraste de pelo menos 3:1 no branco. As regiões têm cor fixa (`REGION_COLOR`), a mesma nos gráficos de Comparar e na página Estados. O verde fica para o que é da marca e para as séries únicas.
 
 ### D24 — Mapa por UF
 
 - **Decisão:** malha de UFs do IBGE de 2022 (API de malhas v3, qualidade intermediária), simplificada sem separar fronteiras vizinhas e projetada na cônica equivalente de Albers (paralelos −2° e −22°), para que a área dos estados seja comparável. O arquivo é gerado por `web/scripts/build-uf-shapes.mjs` e versionado. Ilhas que somem na escala do mapa (como Fernando de Noronha) ficam de fora do desenho.
-- **Classes:** participação no total em seis classes fixas (menos de 0,5%; 0,5% a 1%; 1% a 2,5%; 2,5% a 5%; 5% a 10%; 10% ou mais), iguais para qualquer período e atividade.
+- **Classes:** participação no total em seis classes fixas, iguais para qualquer período e atividade: menos de 0,5%; 0,5% a 0,9%; 1,0% a 2,4%; 2,5% a 4,9%; 5,0% a 9,9%; 10% ou mais. A UF é classificada pelo valor que aparece na tela (uma casa decimal, o mesmo arredondamento de `formatPercent`), para que "0,5%" nunca caia em "menos de 0,5%". Os rótulos antigos ("0,5% a 1%", "1% a 2,5%") deixavam o limite ambíguo e foram trocados em 09/11/2026.
 
 ### D25 — Navegação e assistente em telas pequenas
 
@@ -188,6 +189,18 @@ Formato de cada registro: contexto, decisão, alternativas e justificativa. Hip�
 
 - **Decisão:** `POST /api/v1/assistant/ask` aceita o campo opcional `previous_question` (3 a 500 caracteres), que o site preenche com a pergunta anterior da conversa. O modelo a recebe numa linha própria antes da pergunta, sem quebras de linha nem colchetes, e só a usa para completar o que a pergunta nova deixa em aberto ("e o Ceará?", "e em 2024?"). A pergunta nova prevalece sobre a anterior, e a anterior sobre o contexto da tela.
 - **Alternativa descartada:** mandar a conversa inteira. Mais texto livre por pedido, mais custo de cota e mais espaço para instruções escondidas, sem ganho para as perguntas de continuação, que dependem só da anterior.
+
+### D29 — Siglas de todas as UFs e legenda que explica a cor
+
+- **Siglas:** as UFs grandes têm a sigla dentro da forma. As que não comportam a sigla (RN, PB, PE, AL, SE, ES, RJ e DF) têm a sigla do lado de fora, numa coluna no mar ou ao lado do estado, ligada ao centro da UF por uma linha fina. As posições são espalhadas por código (`calloutPositions`) para que as siglas nunca se toquem em nenhum tamanho de fonte usado pelo mapa (testado de 9 a 22 px). A sigla externa também é clicável. O mapa não foi reduzido: a área de desenho só ganhou uma faixa à direita para a coluna de siglas.
+- **Legenda:** cada classe mostra quantas UFs estão nela no recorte atual; uma linha "sem registros" aparece se alguma UF não tiver dados. Ao passar o cursor, focar ou selecionar uma UF (no mapa ou no ranking), a classe dela é destacada na legenda com a sigla e a porcentagem, e uma frase diz a relação inteira, por exemplo "Minas Gerais: 12,7% do total do Brasil em 2017–2025, na faixa de 10% ou mais". A frase é anunciada a leitores de tela. A faixa também aparece na dica do mapa, no cartão da UF selecionada e no ranking (quadrado da cor da classe).
+- **Dados:** a participação vem da API (`share_pct` do ranking de estados, já com os filtros de período, atividade e finalidade); o site só escolhe a classe. Conferido em 09/11/2026 contra a API em cinco recortes (2017–2025; 2025; 2025 pecuária; 2017 investimento; 2019–2021 agricultura e comercialização): as 27 UFs na classe certa e as contagens da legenda iguais às da API.
+
+### D30 — Anatomia dos gráficos e frase de leitura
+
+- **Anatomia:** linhas retas de 2 px com um ponto por ano (anel branco) e o último valor escrito na ponta, ligado ao ponto por um traço curto da cor da série quando precisa ser afastado de outro rótulo; barras de no máximo 32 px, cantos arredondados só na ponta do dado e 2 px de branco entre as partes empilhadas; grade fina; texto sempre na cor do texto, nunca na cor da série; legenda com a mesma marca do gráfico (traço com ponto para linha, quadrado para barra); dica com o valor primeiro. Um eixo só: não há gráfico com duas escalas.
+- **Frase de leitura:** cada cartão de gráfico abre com uma frase que diz o principal (na página de Minas Gerais: "Em 2025, custeio teve a maior parte: 55,8%; investimento, 22,6%."). A frase só escolhe valores que a API devolveu (a linha do ano final, o maior de uma lista) e não faz conta; sem os dados, não aparece (`components/charts/readings.ts`, com testes).
+- **Desvio da referência visual:** a página do estado não tem um gráfico "estado contra Brasil" com duas escalas. A comparação fica na participação no Brasil, que já é a razão entre os dois.
 
 ## Pendências
 

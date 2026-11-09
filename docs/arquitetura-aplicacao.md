@@ -160,7 +160,7 @@ Implementado em `web/`: React, TypeScript e Tailwind CSS, empacotado pelo Vite c
 
 **Valores.** Num ano só, o site mostra o valor concedido (nominal) ao lado do corrigido; em vários anos, só o corrigido, porque valores nominais de anos diferentes não se somam (D26).
 
-**Mapa e gráficos.** O mapa por UF (D24) usa uma rampa de cor por atividade, mostra os nomes onde cabem, aceita mouse, toque e teclado (setas entre estados vizinhos, Enter seleciona, Esc limpa) e vem com o ranking ao lado. Cada gráfico tem um resumo para leitores de tela e a tabela com os números ("Ver os números"). Os eixos usam valores redondos; as séries têm o nome escrito na ponta da linha, não só a cor.
+**Mapa e gráficos.** O mapa por UF (D24) usa uma rampa de cor por atividade, identifica as 27 UFs (as pequenas com a sigla do lado de fora, ligada por uma linha; D29), aceita mouse, toque e teclado (setas entre estados vizinhos, Enter seleciona, Esc limpa) e vem com o ranking ao lado. A legenda conta as UFs de cada classe no recorte atual e destaca a classe da UF apontada ou selecionada, com uma frase que liga estado, porcentagem e faixa. Cada gráfico abre com uma frase de leitura tirada dos dados da API (D30), tem um resumo para leitores de tela e a tabela com os números ("Ver os números"). Os eixos usam valores redondos; as linhas têm o nome ou o valor escrito na ponta, não só a cor; categorias usam uma paleta validada para daltonismo (D23).
 
 **Assistente de Dados.** Botão fixo em todas as páginas. No computador abre um painel flutuante ao lado do conteúdo, que pode ser minimizado; no celular, um painel inferior que acompanha o teclado virtual. A conversa continua ao fechar, minimizar ou trocar de página. Cada pergunta leva o contexto da tela (D20) e a pergunta anterior (D28); cada resposta mostra a data da coleta e o link para o mesmo recorte no painel. Sem provedor disponível, o painel avisa e o resto do site funciona.
 
@@ -170,7 +170,7 @@ Implementado em `web/`: React, TypeScript e Tailwind CSS, empacotado pelo Vite c
 
 | Ferramenta | O que cobre |
 | --- | --- |
-| Vitest + Testing Library (`npm test`) | Formatação, filtros na URL, base de valores por período, classes do mapa, escalas, cliente da API e o fluxo do assistente (envio, erro, nova tentativa, contexto, pergunta anterior) |
+| Vitest + Testing Library (`npm test`) | Formatação, filtros na URL, base de valores por período, classes do mapa (limites, arredondamento, contagem, sem registros), posição das siglas externas, escalas, frases de leitura dos gráficos, cliente da API e o fluxo do assistente (envio, erro, nova tentativa, contexto, pergunta anterior) |
 | Playwright (`npm run e2e`) | As 8 páginas em 7 tamanhos de tela (320×640 a 1920×1080), sem rolagem horizontal e com capturas de tela; e 9 fluxos: menu, filtros no celular, assistente no celular e no computador, tabela e cartões com paginação e CSV, seleção no ranking, mapa pelo teclado, erros do assistente |
 
 Os testes do Playwright usam a API local e o banco carregado; o assistente é simulado com uma resposta real gravada, para não gastar cota.
