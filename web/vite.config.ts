@@ -10,6 +10,9 @@ const API_TARGET = process.env.API_PROXY_TARGET ?? "http://127.0.0.1:8000";
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
+    // An explicit IPv4 address: "localhost" may resolve to ::1 only (Node 18+ on Windows), and
+    // the browser tests and the API proxy use 127.0.0.1.
+    host: "127.0.0.1",
     port: 5173,
     strictPort: true,
     // Outputs of the browser tests are not source: watching them (and their deletion before a
