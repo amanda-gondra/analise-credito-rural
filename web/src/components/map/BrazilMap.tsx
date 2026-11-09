@@ -2,6 +2,10 @@
  * Choropleth of the 27 UFs (IBGE mesh, equal-area projection; see scripts/build-uf-shapes.mjs).
  *
  * - Color: share of the national total in six fixed classes (lib/shareClasses.ts).
+ * - Names: every UF is named. The ones too small for a name inside (RN, PB, PE, AL, SE, ES,
+ *   RJ and DF) get it beside the coast, or beside the UF for DF, joined by a leader line;
+ *   names of a column are spread so they never touch at any width. A name is also a target:
+ *   it selects its UF, which helps on a phone, where those UFs are smaller than a finger.
  * - Mouse: tooltip next to the pointer, flipped to the other side near the edges, so it
  *   never leaves the map. Touch: a tap selects the UF and the details show below the map.
  * - Keyboard: one UF in the tab order; the arrow keys move to the nearest UF in that
@@ -20,15 +24,52 @@ import {
 
 import shapes from "../../data/uf-shapes.json";
 import { ufName } from "../../lib/domain";
-import { MAP_LABEL, MAP_RAMP } from "../../lib/palette";
+import { MAP_LABEL, MAP_RAMP, NEUTRAL } from "../../lib/palette";
+import { spreadPositions } from "../../lib/scale";
 import { shareClass } from "../../lib/shareClasses";
 
 export type Ramp = keyof typeof MAP_RAMP;
 
-const [VB_X, VB_Y, VB_W, VB_H] = shapes.viewBox as [number, number, number, number];
-const NO_DATA = "#eef0ec";
-// Too small at this scale for a readable label: they are named in the tooltip and the ranking.
-const UNLABELED = new Set(["DF", "SE", "AL", "PB", "RN", "PE", "RJ", "ES"]);
+const [SHAPES_X, VB_Y, SHAPES_W, VB_H] = shapes.viewBox as [number, number, number, number];
+// Room on the right (the Atlantic) for the names of the small UFs of the coast.
+const VB_X = SHAPES_X;
+const VB_W = SHAPES_W + 48;
+export const NO_DATA = "#eef0ec";
+
+/**
+ * UFs named outside their shape, in columns: the names of a column are spread vertically
+ * around the centroids of their UFs. dy moves the wanted position (DF: above its centroid,
+ * clear of the name of Goiás).
+ */
+const CALLOUT_COLUMNS: ReadonlyArray<{ x: number; ufs: readonly string[]; dy?: number }> = [
+  { x: 566, ufs: ["RN", "PB", "PE", "AL", "SE"] },
+  { x: 492, ufs: ["ES", "RJ"] },
+  { x: 390, ufs: ["DF"], dy: -22 },
+];
+const CALLOUT_UFS = new Set(CALLOUT_COLUMNS.flatMap((column) => column.ufs));
+const CENTROIDS = new Map(shapes.ufs.map((item) => [item.uf, [item.cx, item.cy] as const]));
+
+export interface Callout {
+  uf: string;
+  /** Centroid of the UF, where the leader line starts. */
+  from: readonly [number, number];
+  /** Start of the name. */
+  x: number;
+  y: number;
+}
+
+/** Where each outside name goes for a given text size (map units). Pure, so it is testable. */
+export function calloutPositions(labelSize: number): Callout[] {
+  const gap = labelSize * 1.2;
+  return CALLOUT_COLUMNS.flatMap((column) => {
+    const ufs = column.ufs.filter((uf) => CENTROIDS.has(uf));
+    const ys = spreadPositions(
+      ufs.map((uf) => CENTROIDS.get(uf)![1] + (column.dy ?? 0)),
+      gap,
+    );
+    return ufs.map((uf, index) => ({ uf, from: CENTROIDS.get(uf)!, x: column.x, y: ys[index]! }));
+  });
+}
 
 const DIRECTIONS: Record<string, [number, number]> = {
   ArrowRight: [1, 0],
@@ -84,6 +125,10 @@ interface BrazilMapProps {
   ramp: Ramp;
   selected: string | null;
   onSelect: (uf: string | null) => void;
+  /** UF under the pointer or the keyboard focus, so the legend can point at its class. */
+  onHover?: (uf: string | null) => void;
+  /** UF pointed at elsewhere (a row of the ranking): outlined on the map. */
+  highlight?: string | null;
   /** Content of the tooltip for a UF. */
   describe: (uf: string) => ReactNode;
   /** Accessible name of each UF ("Piauí: 1,3% do total"). */
@@ -100,15 +145,22 @@ interface Tip {
   height: number;
 }
 
-export function BrazilMap({ shares, ramp, selected, onSelect, describe, label, title }: BrazilMapProps) {
+export function BrazilMap({ shares, ramp, selected, onSelect, onHover, highlight, describe, label, title }: BrazilMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const pathRefs = useRef(new Map<string, SVGPathElement>());
-  const [tip, setTip] = useState<Tip | null>(null);
+  const [tip, setTipState] = useState<Tip | null>(null);
   const [focusUf, setFocusUf] = useState<string | null>(null);
   const labelSize = useLabelSize(svgRef);
+  const callouts = useMemo(() => calloutPositions(labelSize), [labelSize]);
   const colors = MAP_RAMP[ramp];
   const tabStop = focusUf ?? selected ?? "MT";
+  const pointed = tip?.uf ?? highlight ?? null;
+
+  const setTip = (next: Tip | null) => {
+    setTipState(next);
+    onHover?.(next?.uf ?? null);
+  };
 
   const fills = useMemo(() => {
     const result = new Map<string, { fill: string; text: string }>();
@@ -170,7 +222,7 @@ export function BrazilMap({ shares, ramp, selected, onSelect, describe, label, t
         viewBox={`${VB_X} ${VB_Y} ${VB_W} ${VB_H}`}
         role="group"
         aria-label={title}
-        className="mx-auto block h-auto w-full max-w-[36rem] touch-manipulation"
+        className="mx-auto block h-auto w-full max-w-[38rem] touch-manipulation"
       >
         {shapes.ufs.map((item) => {
           const color = fills.get(item.uf)!;
@@ -215,20 +267,21 @@ export function BrazilMap({ shares, ramp, selected, onSelect, describe, label, t
             pointerEvents="none"
           />
         )}
-        {focusUf && focusUf !== selected && tip?.uf === focusUf && (
+        {pointed && pointed !== selected && (
           <path
-            d={shapes.ufs.find((item) => item.uf === focusUf)!.d}
+            d={shapes.ufs.find((item) => item.uf === pointed)!.d}
             fill="none"
             stroke="#174b32"
             strokeWidth={2}
-            strokeDasharray="4 3"
+            strokeDasharray={focusUf === pointed ? "4 3" : undefined}
+            strokeLinejoin="round"
             vectorEffect="non-scaling-stroke"
             pointerEvents="none"
           />
         )}
         <g aria-hidden="true" pointerEvents="none" className="select-none">
           {shapes.ufs
-            .filter((item) => !UNLABELED.has(item.uf))
+            .filter((item) => !CALLOUT_UFS.has(item.uf))
             .map((item) => (
               <text
                 key={item.uf}
@@ -243,6 +296,65 @@ export function BrazilMap({ shares, ramp, selected, onSelect, describe, label, t
                 {item.uf}
               </text>
             ))}
+        </g>
+        {/* Names beside the small UFs: ink with a white halo, readable over the sea or any class. */}
+        <g aria-hidden="true" className="select-none">
+          {callouts.map((callout) => {
+            const active = callout.uf === selected || callout.uf === pointed;
+            return (
+              <g
+                key={callout.uf}
+                className="cursor-pointer"
+                onClick={() => onSelect(callout.uf === selected ? null : callout.uf)}
+                onPointerEnter={(event) => showAtPointer(callout.uf, event)}
+                onPointerMove={(event) => showAtPointer(callout.uf, event)}
+              >
+                <line
+                  x1={callout.from[0]}
+                  y1={callout.from[1]}
+                  x2={callout.x - labelSize * 0.3}
+                  y2={callout.y}
+                  stroke={active ? NEUTRAL.ink : NEUTRAL.axis}
+                  strokeWidth={active ? 1.25 : 0.75}
+                  vectorEffect="non-scaling-stroke"
+                  pointerEvents="none"
+                />
+                <circle
+                  cx={callout.from[0]}
+                  cy={callout.from[1]}
+                  r={labelSize * 0.16}
+                  fill={NEUTRAL.ink}
+                  stroke="#ffffff"
+                  strokeWidth={1}
+                  vectorEffect="non-scaling-stroke"
+                  pointerEvents="none"
+                />
+                {/* Hit area larger than the text (and than a fingertip on a phone). */}
+                <rect
+                  x={callout.x - labelSize * 0.4}
+                  y={callout.y - labelSize * 0.85}
+                  width={labelSize * 2}
+                  height={labelSize * 1.7}
+                  fill="transparent"
+                />
+                <text
+                  x={callout.x}
+                  y={callout.y}
+                  dominantBaseline="central"
+                  fontSize={labelSize}
+                  fontWeight={active ? 700 : 600}
+                  fill={NEUTRAL.ink}
+                  stroke="#ffffff"
+                  strokeWidth={labelSize * 0.3}
+                  strokeLinejoin="round"
+                  paintOrder="stroke"
+                  pointerEvents="none"
+                >
+                  {callout.uf}
+                </text>
+              </g>
+            );
+          })}
         </g>
       </svg>
       {tip && (

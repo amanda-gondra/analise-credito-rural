@@ -34,3 +34,23 @@ export function spreadLabels(labels: EndLabel[], top: number, plotHeight: number
   }
   return Object.fromEntries(placed.map((label) => [label.key, label.y - label.natural]));
 }
+
+/**
+ * Positions at least `gap` apart, as close as possible to the wanted ones (in any unit): the
+ * labels are pushed down in order and the group is then moved back so that, on average, it
+ * stays where the labels wanted to be. Used for the UF names set beside the map.
+ */
+export function spreadPositions(wanted: readonly number[], gap: number): number[] {
+  if (wanted.length === 0) return [];
+  const order = wanted.map((value, index) => ({ value, index })).sort((a, b) => a.value - b.value);
+  const placed = order.map((item) => item.value);
+  for (let index = 1; index < placed.length; index += 1) {
+    placed[index] = Math.max(placed[index]!, placed[index - 1]! + gap);
+  }
+  const shift = order.reduce((sum, item, index) => sum + item.value - placed[index]!, 0) / placed.length;
+  const result: number[] = Array.from({ length: wanted.length }, () => 0);
+  order.forEach((item, index) => {
+    result[item.index] = placed[index]! + shift;
+  });
+  return result;
+}

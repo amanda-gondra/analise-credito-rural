@@ -14,9 +14,10 @@ import {
   writeFilters,
 } from "./filters";
 import { formatCount, formatDate, formatMoney, formatMoneyFull, formatMoneyTick, formatPercent, formatPeriod } from "./format";
+import { calloutPositions } from "../components/map/BrazilMap";
 import { CATEGORY, MAP_RAMP } from "./palette";
-import { niceTicks, spreadLabels } from "./scale";
-import { SHARE_BREAKS, shareClass, shareClassLabel } from "./shareClasses";
+import { niceTicks, spreadLabels, spreadPositions } from "./scale";
+import { SHARE_BREAKS, classCounts, shareClass, shareClassLabel } from "./shareClasses";
 
 const NBSP = String.fromCharCode(0x00a0);
 const MINUS = String.fromCharCode(0x2212);
@@ -123,14 +124,53 @@ describe("map", () => {
   it("puts each share in one of six fixed classes", () => {
     expect(shareClass(0.02)).toBe(0);
     expect(shareClass(0.5)).toBe(1);
-    expect(shareClass(2.49)).toBe(2);
+    expect(shareClass(2.44)).toBe(2);
     expect(shareClass(2.5)).toBe(3);
     expect(shareClass(13.4)).toBe(5);
+    expect(shareClass(0)).toBe(0);
     expect(shareClass(null)).toBeNull();
+    expect(shareClass(undefined)).toBeNull();
+    expect(shareClass(Number.NaN)).toBeNull();
     expect(SHARE_BREAKS).toHaveLength(MAP_RAMP.total.length - 1);
-    expect(shareClassLabel(0)).toBe("menos de 0,5%");
-    expect(shareClassLabel(3)).toBe("2,5% a 5%");
-    expect(shareClassLabel(5)).toBe("10% ou mais");
+    expect([0, 1, 2, 3, 4, 5].map(shareClassLabel)).toEqual([
+      "menos de 0,5%",
+      "0,5% a 0,9%",
+      "1,0% a 2,4%",
+      "2,5% a 4,9%",
+      "5,0% a 9,9%",
+      "10% ou mais",
+    ]);
+  });
+
+  it("classifies a share as it is written, so the number and the class always agree", () => {
+    // Shares as the API sends them (two decimals), on both sides of each break.
+    for (const share of [0.44, 0.45, 0.94, 0.95, 2.44, 2.45, 4.94, 4.95, 9.94, 9.95, 9.96, 10]) {
+      const shown = Number(formatPercent(share).replace("%", "").replace(",", "."));
+      const index = shareClass(share)!;
+      const lower = index === 0 ? 0 : SHARE_BREAKS[index - 1]!;
+      const upper = SHARE_BREAKS[index] ?? Infinity;
+      expect(shown >= lower && shown < upper, `${share} written ${shown}, class ${index}`).toBe(true);
+    }
+    expect(shareClass(9.96)).toBe(5); // written 10,0%: "10% ou mais", not "5,0% a 9,9%"
+    expect(shareClass(2.44)).toBe(2); // written 2,4%
+    expect(shareClass(2.45)).toBe(3); // written 2,5%
+  });
+
+  it("counts the UFs of each class and those without a record", () => {
+    expect(classCounts([13.4, 12.7, 0.7, 0.2, null, undefined])).toEqual({ byClass: [1, 1, 0, 0, 0, 2], missing: 2 });
+  });
+
+  it("names every UF: the small ones beside the map, never touching, at any text size", () => {
+    // The other 19 UFs are named inside their shape (BrazilMap draws every UF not listed here).
+    expect(calloutPositions(11).map((item) => item.uf).sort()).toEqual(["AL", "DF", "ES", "PB", "PE", "RJ", "RN", "SE"]);
+    for (const size of [9, 11, 14, 18, 22]) {
+      const placed = calloutPositions(size);
+      for (const a of placed) {
+        for (const b of placed) {
+          if (a.uf < b.uf && a.x === b.x) expect(Math.abs(a.y - b.y), `${a.uf}/${b.uf} at ${size}`).toBeGreaterThanOrEqual(size * 1.2 - 1e-9);
+        }
+      }
+    }
   });
 
   it("uses no purple anywhere in the data colors", () => {
@@ -169,5 +209,14 @@ describe("axes", () => {
     expect(offsets.BA).toBe(0);
     expect(offsets.TO).toBe(0);
     expect(offsets.MA).toBeCloseTo(11); // 4 px apart become 15 px
+  });
+
+  it("spreads positions apart and keeps the group around where it wanted to be", () => {
+    expect(spreadPositions([10, 50], 10)).toEqual([10, 50]); // already apart
+    expect(spreadPositions([20, 20, 20], 10)).toEqual([10, 20, 30]);
+    const placed = spreadPositions([5, 0], 10); // order of the input is kept
+    expect(placed[0]! - placed[1]!).toBe(10);
+    expect((placed[0]! + placed[1]!) / 2).toBe(2.5);
+    expect(spreadPositions([], 10)).toEqual([]);
   });
 });

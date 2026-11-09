@@ -2,16 +2,18 @@
  * Map, legend, the selected UF and the ranking, side by side on a computer and stacked on a
  * phone (map first). The selection lives in the URL (state=PI) so it can be shared.
  */
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router";
 
 import type { StateRank } from "../../api/types";
 import { ACTIVITY_LABEL, type Activity, REGION_LABEL, ufName } from "../../lib/domain";
 import { type Filters, amountBasis, readUf, useParam } from "../../lib/filters";
 import { formatCount, formatMoney, formatPercent, formatPeriod } from "../../lib/format";
+import { MAP_RAMP } from "../../lib/palette";
+import { shareClass, shareClassLabel } from "../../lib/shareClasses";
 import { Icon } from "../ui/Icon";
 import { BrazilMap, type Ramp } from "./BrazilMap";
-import { MapLegend } from "./MapLegend";
+import { ClassSwatch, MapLegend } from "./MapLegend";
 import { RankingList } from "./RankingList";
 
 function rampOf(activity: Activity | null): Ramp {
@@ -33,9 +35,19 @@ export function TerritoryView({ rows, filters }: { rows: StateRank[]; filters: F
   const mainLabel = singleYear ? "Valor concedido" : "Valor corrigido";
   const mainAmount = (row: StateRank) => (singleYear ? row.amount_nominal : row.amount_real);
 
+  // UF under the pointer (map or ranking); the legend explains it, or else the selected UF.
+  const [hovered, setHovered] = useState<string | null>(null);
+  const active = hovered ?? selected;
+  const whole = `do total do Brasil em ${period}`;
+  const classOf = (share: number | null | undefined) => {
+    const index = shareClass(share);
+    return index === null ? null : { index, color: MAP_RAMP[ramp][index]!, label: shareClassLabel(index) };
+  };
+
   const describe = (uf: string) => {
     const row = byUf.get(uf);
     if (!row) return <p className="text-ink-2">Sem registros no período.</p>;
+    const rank = classOf(row.share_pct);
     return (
       <dl className="mt-1 grid grid-cols-[auto_auto] gap-x-3 gap-y-0.5 text-ink-2">
         <dt>{mainLabel}</dt>
@@ -44,14 +56,27 @@ export function TerritoryView({ rows, filters }: { rows: StateRank[]; filters: F
         <dd className="tabular text-right font-medium text-ink">{formatPercent(row.share_pct)}</dd>
         <dt>Posição</dt>
         <dd className="tabular text-right text-ink">{row.position}º</dd>
+        {rank && (
+          <>
+            <dt>Faixa</dt>
+            <dd className="flex items-center justify-end gap-1.5 whitespace-nowrap text-ink">
+              <ClassSwatch color={rank.color} />
+              {rank.label}
+            </dd>
+          </>
+        )}
       </dl>
     );
   };
 
   const label = (uf: string) => {
     const row = byUf.get(uf);
-    return row ? `${ufName(uf)}: ${formatPercent(row.share_pct)} do total, ${row.position}º lugar` : `${ufName(uf)}: sem registros`;
+    const rank = classOf(row?.share_pct);
+    return row
+      ? `${ufName(uf)}: ${formatPercent(row.share_pct)} do total, ${row.position}º lugar${rank ? `, faixa de ${rank.label}` : ""}`
+      : `${ufName(uf)}: sem registros`;
   };
+  const chosenClass = chosen ? classOf(chosen.share_pct) : null;
 
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
@@ -61,6 +86,8 @@ export function TerritoryView({ rows, filters }: { rows: StateRank[]; filters: F
           ramp={ramp}
           selected={selected}
           onSelect={setSelected}
+          onHover={setHovered}
+          highlight={hovered}
           describe={describe}
           label={label}
           title={`Mapa do Brasil: participação de cada UF no ${subject} de ${period}`}
@@ -70,7 +97,7 @@ export function TerritoryView({ rows, filters }: { rows: StateRank[]; filters: F
         </p>
       </div>
       <div className="flex min-w-0 flex-col gap-5">
-        <MapLegend ramp={ramp} title={`Participação no total de ${period}`} />
+        <MapLegend ramp={ramp} title={`Participação no total do Brasil, ${period}`} shares={shares} active={active} whole={whole} />
         {chosen ? (
           <div className="rounded-2xl bg-forest-50 p-4" aria-live="polite">
             <div className="flex items-start justify-between gap-3">
@@ -96,7 +123,11 @@ export function TerritoryView({ rows, filters }: { rows: StateRank[]; filters: F
               </div>
               <div>
                 <dt className="text-ink-2">Participação</dt>
-                <dd className="tabular text-base font-semibold text-ink">{formatPercent(chosen.share_pct)}</dd>
+                <dd className="flex items-center gap-2 tabular text-base font-semibold text-ink">
+                  {chosenClass && <ClassSwatch color={chosenClass.color} />}
+                  {formatPercent(chosen.share_pct)}
+                </dd>
+                {chosenClass && <dd className="mt-0.5 text-xs text-ink-2">faixa de {chosenClass.label}</dd>}
               </div>
               {singleYear && (
                 <div>
@@ -127,7 +158,7 @@ export function TerritoryView({ rows, filters }: { rows: StateRank[]; filters: F
         )}
         <div>
           <h3 className="mb-2 text-sm font-semibold text-ink">Ranking dos estados</h3>
-          <RankingList rows={rows} ramp={ramp} selected={selected} onSelect={setSelected} />
+          <RankingList rows={rows} ramp={ramp} selected={selected} onSelect={setSelected} onHover={setHovered} />
         </div>
       </div>
     </div>
