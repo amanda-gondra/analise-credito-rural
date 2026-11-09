@@ -42,6 +42,8 @@ def test_every_question_has_its_query():
         "yearly_totals", "state_ranking", "matopiba_yearly", "activity_split", "purpose_split",
         "states_yearly", "regions_yearly", "program_ranking", "funding_source_ranking",
         "seasonality", "average_contract_value",
+        # data explorer
+        "credit_rows", "credit_summary",
         # metadata for the API
         "loaded_years", "program_names", "latest_ipca",
     }
@@ -195,6 +197,53 @@ def test_an_impossible_filter_returns_no_average_instead_of_an_error(run):
                activity_code=None, purpose=None, program_name=None)
     assert rows[-1]["contracts"] is None
     assert rows[-1]["average_nominal"] is None
+
+
+# --- data explorer ---------------------------------------------------------------------------
+
+EXPLORER_FILTERS = {"first_year": 2024, "last_year": 2024, "state_abbr": "PI", "region_name": None,
+                    "activity_code": "2", "purpose": None, "program_name": None}
+NO_KEY = dict.fromkeys(["after_year", "after_month", "after_state", "after_activity", "after_program",
+                        "after_subprogram", "after_funding_source", "after_purpose"])
+
+
+def _key(row):
+    return {
+        "after_year": row["reference_year"], "after_month": row["reference_month"],
+        "after_state": row["state_abbr"], "after_activity": row["activity_code"],
+        "after_program": row["program_name"], "after_subprogram": row["subprogram_name"],
+        "after_funding_source": row["funding_source_name"], "after_purpose": row["purpose"],
+    }
+
+
+def test_pages_after_the_key_cover_every_row_once_in_order(run):
+    everything = run("credit_rows", **EXPLORER_FILTERS, **NO_KEY, row_limit=100_000)
+    pages, key = [], NO_KEY
+    while True:
+        page = run("credit_rows", **EXPLORER_FILTERS, **key, row_limit=37)
+        pages.extend(page)
+        if len(page) < 37:
+            break
+        key = _key(page[-1])
+    assert len(everything) > 37  # more than one page, or the test proves nothing
+    assert pages == everything
+    keys = [tuple(_key(r).values()) for r in everything]
+    assert len(set(keys)) == len(keys)
+
+
+def test_explorer_rows_add_up_to_the_summary_and_to_question_1(run):
+    rows = run("credit_rows", **EXPLORER_FILTERS, **NO_KEY, row_limit=100_000)
+    summary = run("credit_summary", **EXPLORER_FILTERS)[0]
+    yearly = run("yearly_totals", first_year=2024, last_year=2024, state_abbr="PI", activity_code="2", purpose=None)
+    assert summary["row_count"] == len(rows)
+    assert summary["contracts"] == sum(r["contract_count"] for r in rows) == yearly[0]["contracts"]
+    assert sum(r["amount_nominal"] for r in rows) == yearly[0]["amount_nominal"]
+    assert close(summary["amount_real"], yearly[0]["amount_real"], CENT)
+
+
+def test_an_empty_selection_has_a_summary_of_zeros(run):
+    summary = run("credit_summary", **{**EXPLORER_FILTERS, "region_name": "SUL"})
+    assert summary == [{"row_count": 0, "contracts": 0, "amount_real": 0}]
 
 
 # --- read-only access ------------------------------------------------------------------------

@@ -383,6 +383,74 @@ ORDER BY reference_year NULLS LAST;
 
 
 -- =============================================================================
+-- Data explorer (GET /api/v1/credit and /api/v1/credit.csv): the rows themselves.
+-- Same filters as question 11. Rows come in the order of the primary key of
+-- credit_monthly, so a page continues after the key of the last row of the previous
+-- one (keyset pagination): every page costs the same, and a row is never skipped or
+-- repeated because of an offset.
+-- =============================================================================
+
+
+-- name: credit_rows
+-- Parameters: :first_year, :last_year, :row_limit (required);
+--             :state_abbr, :region_name, :activity_code, :purpose, :program_name (optional);
+--             :after_year, :after_month, :after_state, :after_activity, :after_program,
+--             :after_subprogram, :after_funding_source, :after_purpose: the key of the last
+--             row already shown, all NULL for the first page.
+-- One row per month x UF x activity x program x subprogram x funding source x purpose.
+SELECT
+    reference_year,
+    reference_month,
+    state_abbr,
+    region_name,
+    activity_code,
+    purpose,
+    program_name,
+    subprogram_name,
+    funding_source_name,
+    contract_count,
+    credit_amount                AS amount_nominal,
+    ROUND(credit_amount_real, 2) AS amount_real
+FROM credit_monthly_adjusted
+WHERE reference_year BETWEEN :first_year AND :last_year
+  AND (CAST(:state_abbr AS CHAR(2)) IS NULL OR state_abbr = CAST(:state_abbr AS CHAR(2)))
+  AND (CAST(:region_name AS TEXT) IS NULL OR region_name = CAST(:region_name AS TEXT))
+  AND (CAST(:activity_code AS CHAR(1)) IS NULL OR activity_code = CAST(:activity_code AS CHAR(1)))
+  AND (CAST(:purpose AS TEXT) IS NULL OR purpose = CAST(:purpose AS TEXT))
+  AND (CAST(:program_name AS TEXT) IS NULL OR program_name = CAST(:program_name AS TEXT))
+  AND (
+      CAST(:after_year AS SMALLINT) IS NULL
+      OR (reference_year, reference_month, state_abbr, activity_code,
+          program_name, subprogram_name, funding_source_name, purpose)
+       > (CAST(:after_year AS SMALLINT), CAST(:after_month AS SMALLINT),
+          CAST(:after_state AS CHAR(2)), CAST(:after_activity AS CHAR(1)),
+          CAST(:after_program AS TEXT), CAST(:after_subprogram AS TEXT),
+          CAST(:after_funding_source AS TEXT), CAST(:after_purpose AS TEXT))
+  )
+ORDER BY reference_year, reference_month, state_abbr, activity_code,
+         program_name, subprogram_name, funding_source_name, purpose
+LIMIT :row_limit;
+
+
+-- name: credit_summary
+-- Parameters: the filters of credit_rows, without the key and the limit.
+-- How many rows the filters select, with their contracts and their total at December 2025
+-- prices (real values, because the rows may span several years).
+-- An empty selection has 0 rows, 0 contracts and R$ 0, not NULL.
+SELECT
+    COUNT(*)                                       AS row_count,
+    COALESCE(SUM(contract_count), 0)               AS contracts,
+    COALESCE(ROUND(SUM(credit_amount_real), 2), 0) AS amount_real
+FROM credit_monthly_adjusted
+WHERE reference_year BETWEEN :first_year AND :last_year
+  AND (CAST(:state_abbr AS CHAR(2)) IS NULL OR state_abbr = CAST(:state_abbr AS CHAR(2)))
+  AND (CAST(:region_name AS TEXT) IS NULL OR region_name = CAST(:region_name AS TEXT))
+  AND (CAST(:activity_code AS CHAR(1)) IS NULL OR activity_code = CAST(:activity_code AS CHAR(1)))
+  AND (CAST(:purpose AS TEXT) IS NULL OR purpose = CAST(:purpose AS TEXT))
+  AND (CAST(:program_name AS TEXT) IS NULL OR program_name = CAST(:program_name AS TEXT));
+
+
+-- =============================================================================
 -- Metadata for the API (GET /api/v1/metadata): what is loaded and when it was collected.
 -- =============================================================================
 

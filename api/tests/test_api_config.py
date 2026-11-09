@@ -14,7 +14,8 @@ from api.tests.conftest import make_settings
 ROUTE_QUERIES = {
     "yearly_totals", "state_ranking", "matopiba_yearly", "activity_split", "purpose_split",
     "states_yearly", "regions_yearly", "program_ranking", "funding_source_ranking",
-    "seasonality", "average_contract_value", "loaded_years", "program_names", "latest_ipca",
+    "seasonality", "average_contract_value", "credit_rows", "credit_summary",
+    "loaded_years", "program_names", "latest_ipca",
 }
 
 

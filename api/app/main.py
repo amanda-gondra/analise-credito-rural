@@ -34,9 +34,9 @@ from api.app.errors import register_exception_handlers
 from api.app.middleware.rate_limit import RateLimitMiddleware
 from api.app.middleware.request_context import REQUEST_ID_HEADER, RequestContextMiddleware
 from api.app.middleware.request_limits import RequestBodyLimitMiddleware
-from api.app.routes import assistant, breakdowns, health, metadata, overview, regions, states
+from api.app.routes import assistant, breakdowns, credit, health, metadata, overview, regions, states
 
-API_VERSION: Final = "1.1.0"
+API_VERSION: Final = "1.2.0"
 _LOG_FORMAT: Final = "%(asctime)s %(levelname)s %(name)s %(message)s"
 
 
@@ -53,8 +53,13 @@ nominais; totais de vários anos usam valores reais.
 **Período padrão:** 2017 a 2025 (série principal). Os valores aceitos em cada filtro estão
 em `GET /api/v1/metadata`.
 
+**Dados linha a linha:** `GET /api/v1/credit` devolve as linhas da base em páginas (o
+cursor da próxima página vem em `page.next_cursor`) e `GET /api/v1/credit.csv` devolve as
+mesmas linhas em CSV para planilhas em português (`;`, vírgula decimal, UTF-8 com BOM).
+
 **Assistente:** `POST /api/v1/assistant/ask` responde perguntas em português usando as
-mesmas consultas das rotas, sem escrever SQL. Até {settings.assistant_per_minute} perguntas
+mesmas consultas das rotas, sem escrever SQL. O campo opcional `context` informa a página e
+os filtros em tela; a pergunta prevalece sobre ele. Até {settings.assistant_per_minute} perguntas
 por minuto e {settings.assistant_per_day} por dia por visitante.
 
 **Limites:** até {settings.rate_limit_per_minute} pedidos por minuto às rotas `/api/v1/`
@@ -62,7 +67,7 @@ por minuto e {settings.assistant_per_day} por dia por visitante.
 
 **Erros** têm sempre o formato `{{"error": {{"code", "message", "request_id", "details"}}}}`:
 400 JSON inválido · 404 rota inexistente · 405 método errado · 413 corpo grande demais ·
-422 parâmetro inválido · 429 limite de pedidos ou de perguntas · 500 erro interno ·
+422 parâmetro inválido ou CSV grande demais · 429 limite de pedidos ou de perguntas · 500 erro interno ·
 503 banco ou assistente indisponível. Toda resposta traz o cabeçalho `X-Request-ID`.
 """
 
@@ -121,6 +126,7 @@ def create_app(
         states.router,
         regions.router,
         breakdowns.router,
+        credit.router,
         assistant.router,
         health.router,
     ):

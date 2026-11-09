@@ -5,12 +5,15 @@
     3. the results go back and the model writes the answer, or asks for more tools;
     4. after MAX_ROUNDS of tools the model must answer with what it has.
 
+When the site sends the screen context (context.py), its line follows the question in the
+same user turn, built only from validated words.
+
 A call to explain_out_of_scope ends the loop with the fixed text of the topic (scope.py),
 without a second call to the model. If a provider fails at any point, the whole question
 starts again with the next provider; if all fail, AssistantUnavailableError (503), and the
 panel keeps working because it does not depend on the model.
 
-Logged: provider, tools, rounds and duration. Never the question or the answer.
+Logged: provider, tools, page of the context and duration. Never the question or the answer.
 """
 
 from __future__ import annotations
@@ -21,6 +24,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Final
 
+from api.app.assistant.context import ScreenContext
 from api.app.assistant.conversation import ModelReply, Provider, ProviderError, ToolOutput, Turn, UserTurn
 from api.app.assistant.prompt import SYSTEM_PROMPT
 from api.app.assistant.scope import out_of_scope_message
@@ -53,26 +57,28 @@ class Assistant:
     def available(self) -> bool:
         return bool(self._providers)
 
-    def ask(self, question: str, database: QueryRunner) -> AssistantAnswer:
+    def ask(self, question: str, database: QueryRunner, context: ScreenContext | None = None) -> AssistantAnswer:
+        message = question if context is None else f"{question}\n\n{context.describe()}"
         for provider in self._providers:
             started = time.perf_counter()
             try:
-                answer = self._conversation(provider, question, database)
+                answer = self._conversation(provider, message, database)
             except ProviderError as error:
                 logger.warning("provider failed: %s", error)
                 continue
             logger.info(
-                "answered: provider=%s tools=%s out_of_scope=%s duration_ms=%.0f",
+                "answered: provider=%s tools=%s out_of_scope=%s page=%s duration_ms=%.0f",
                 provider.name,
                 ",".join(result.tool for result in answer.results) or "-",
                 answer.out_of_scope,
+                context.page if context is not None else "-",
                 1000 * (time.perf_counter() - started),
             )
             return answer
         raise AssistantUnavailableError
 
-    def _conversation(self, provider: Provider, question: str, database: QueryRunner) -> AssistantAnswer:
-        turns: list[Turn] = [UserTurn(question)]
+    def _conversation(self, provider: Provider, message: str, database: QueryRunner) -> AssistantAnswer:
+        turns: list[Turn] = [UserTurn(message)]
         results: list[ToolResult] = []
         for round_number in range(MAX_ROUNDS + 1):
             reply = provider.complete(

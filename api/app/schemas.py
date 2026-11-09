@@ -17,6 +17,7 @@ from typing import Annotated, Any, Final, Generic, Literal, TypeVar
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StringConstraints
 
+from api.app.assistant.context import ScreenContext
 from api.app.filters import ACTIVITY_BY_CODE, PRICE_BASE, Activity, Region
 
 SOURCE: Final = "Banco Central do Brasil, Matriz de Dados do Crédito Rural (MDCR)"
@@ -154,6 +155,42 @@ class AverageContract(_Row):
     average_real: float | None = Field(description="Same, at December 2025 prices.")
 
 
+class CreditRow(_Row):
+    """One row of credit_monthly: month x UF x activity x program x subprogram x funding source x purpose."""
+
+    year: YearColumn
+    month: int = Field(validation_alias="reference_month")
+    state: str = Field(validation_alias="state_abbr")
+    region: RegionColumn
+    activity: ActivityColumn
+    purpose: str
+    program: str = Field(validation_alias="program_name", description="As published by the source.")
+    subprogram: str = Field(validation_alias="subprogram_name", description="As published by the source.")
+    funding_source: str = Field(validation_alias="funding_source_name", description="As published by the source.")
+    contracts: Contracts = Field(validation_alias="contract_count")
+    amount_nominal: AmountNominal
+    amount_real: AmountReal
+
+
+class CreditPageInfo(BaseModel):
+    limit: int = Field(description="Rows per page asked for.")
+    next_cursor: str | None = Field(description="Pass as cursor to get the next page; null on the last page.")
+    csv_max_rows: int = Field(description="Most rows /api/v1/credit.csv accepts; narrow the filters above it.")
+
+
+class CreditSummary(BaseModel):
+    rows: int = Field(validation_alias="row_count", description="Rows the filters select, in every page.")
+    contracts: Contracts
+    amount_real: float = Field(description="Total of the selection at December 2025 prices (IPCA).")
+
+
+class CreditPage(BaseModel):
+    data: list[CreditRow]
+    meta: Meta
+    page: CreditPageInfo
+    summary: CreditSummary
+
+
 class StateProfile(BaseModel):
     """Question 7: the same numbers as the other routes, for one UF."""
 
@@ -200,6 +237,13 @@ class AskRequest(BaseModel):
 
     question: Annotated[str, StringConstraints(strip_whitespace=True, min_length=3, max_length=500)] = Field(
         description="Question in Portuguese about rural credit in Brazil (3 to 500 characters)."
+    )
+    context: ScreenContext | None = Field(
+        default=None,
+        description=(
+            "Page and filters on screen when the question was asked. Optional; it only fills what the "
+            "question leaves open, and the question wins when they disagree."
+        ),
     )
 
 

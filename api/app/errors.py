@@ -7,6 +7,7 @@ Every error has the same body: {"error": {"code", "message", "request_id", "deta
     405 method_not_allowed     wrong method (GET everywhere; POST only for the assistant)
     413 payload_too_large      body above MAX_REQUEST_BODY_BYTES (see middleware)
     422 validation_error       unknown parameter, value out of the accepted list or range
+    422 export_too_large       the CSV export would have more rows than MAX_EXPORT_ROWS
     429 rate_limited           above RATE_LIMIT_PER_MINUTE (see middleware), with Retry-After
     429 assistant_limit        question quota of the visitor or of the site, with Retry-After
     500 internal_error         unexpected failure; details stay in the server log
@@ -30,6 +31,7 @@ from starlette.exceptions import HTTPException
 from api.app.assistant.agent import AssistantUnavailableError
 from api.app.assistant.quota import QuotaExceededError
 from api.app.database import DatabaseUnavailableError
+from api.app.explorer import MAX_EXPORT_ROWS, ExportTooLargeError
 
 logger = logging.getLogger("rural_credit_api.errors")
 
@@ -133,6 +135,16 @@ async def _assistant_limit(request: Request, exc: Exception) -> JSONResponse:
     )
 
 
+async def _export_too_large(request: Request, exc: Exception) -> JSONResponse:
+    return error_response(
+        422,
+        "export_too_large",
+        f"These filters select more than {MAX_EXPORT_ROWS} rows, the limit of the CSV export. "
+        "Narrow the period or add filters.",
+        _request_id(request),
+    )
+
+
 async def _internal_error(request: Request, exc: Exception) -> JSONResponse:
     logger.exception(
         "internal error: request_id=%s type=%s", _request_id(request), type(exc).__name__
@@ -146,4 +158,5 @@ def register_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(DatabaseUnavailableError, _database_unavailable)
     app.add_exception_handler(AssistantUnavailableError, _assistant_unavailable)
     app.add_exception_handler(QuotaExceededError, _assistant_limit)
+    app.add_exception_handler(ExportTooLargeError, _export_too_large)
     app.add_exception_handler(Exception, _internal_error)
