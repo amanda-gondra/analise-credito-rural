@@ -143,6 +143,32 @@ describe("assistant panel", () => {
     expect(within(panel).getByText("Qual a participação do Piauí?")).toBeVisible();
   });
 
+  it("sends the previous question with a follow-up, and forgets it after clearing the conversation", async () => {
+    const fetchMock = mockApi(() => new Response(JSON.stringify(ANSWER), { status: 200 }));
+    const user = userEvent.setup();
+    renderAt("/");
+    await user.click(screen.getByRole("button", { name: "Assistente de Dados" }));
+    const panel = screen.getByRole("dialog", { name: "Assistente de Dados" });
+    const input = within(panel).getByRole("textbox", { name: "Sua pergunta" });
+    const asked = () =>
+      fetchMock.mock.calls
+        .filter(([url]) => String(url).includes("/assistant/ask"))
+        .map(([, init]) => JSON.parse(String(init?.body)) as Record<string, unknown>);
+
+    await user.type(input, "Quanto o Piauí recebeu em 2025?{Enter}");
+    await within(panel).findByText("R$ 4,6 bilhões");
+    await user.type(input, "E o Ceará?{Enter}");
+    await waitFor(() => expect(asked()).toHaveLength(2));
+    expect(asked()[0]).not.toHaveProperty("previous_question");
+    expect(asked()[1]).toMatchObject({ question: "E o Ceará?", previous_question: "Quanto o Piauí recebeu em 2025?" });
+
+    await waitFor(() => expect(within(panel).getByRole("button", { name: "Limpar conversa" })).toBeEnabled());
+    await user.click(within(panel).getByRole("button", { name: "Limpar conversa" }));
+    await user.type(input, "Quem lidera?{Enter}");
+    await waitFor(() => expect(asked()).toHaveLength(3));
+    expect(asked()[2]).not.toHaveProperty("previous_question");
+  });
+
   it("follows a source link to the page of the panel", async () => {
     mockApi(() => new Response(JSON.stringify(ANSWER), { status: 200 }));
     const user = userEvent.setup();

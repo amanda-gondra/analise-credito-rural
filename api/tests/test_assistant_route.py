@@ -59,6 +59,9 @@ def test_refusal_is_flagged(make_client):
         ({"question": "x" * 501}, 422, "validation_error"),
         ({"question": "Pergunta?", "model": "other"}, 422, "validation_error"),
         ({}, 422, "validation_error"),
+        ({"question": "Pergunta?", "previous_question": "oi"}, 422, "validation_error"),
+        ({"question": "Pergunta?", "previous_question": "x" * 501}, 422, "validation_error"),
+        ({"question": "Pergunta?", "previous_question": ["Quanto?"]}, 422, "validation_error"),
     ],
 )
 def test_invalid_questions_never_reach_the_model(make_client, payload, status, code):
@@ -122,6 +125,22 @@ def test_an_invalid_context_never_reaches_the_model(make_client, context):
 
     assert (response.status_code, response.json()["error"]["code"]) == (422, "validation_error")
     assert provider.requests == []
+
+
+def test_the_previous_question_reaches_the_model_before_the_question(make_client):
+    provider = ScriptedProvider("gemini", [text_reply("Resposta.")])
+    client = make_client(providers=[provider])
+
+    response = client.post(URL, json={
+        "question": "E o Ceará?",
+        "previous_question": "  Quanto o Piauí recebeu em 2025?  ",
+        "context": {"page": "overview"},
+    })
+
+    assert response.status_code == 200
+    previous, question, _ = provider.requests[0]["turns"][0].text.split("\n\n")
+    assert previous == "[Previous question of the visitor: Quanto o Piauí recebeu em 2025?]"
+    assert question == "E o Ceará?"
 
 
 def test_invalid_json_gets_400_and_a_large_body_413(make_client):

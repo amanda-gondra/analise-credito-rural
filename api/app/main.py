@@ -36,7 +36,7 @@ from api.app.middleware.request_context import REQUEST_ID_HEADER, RequestContext
 from api.app.middleware.request_limits import RequestBodyLimitMiddleware
 from api.app.routes import assistant, breakdowns, credit, health, metadata, overview, regions, states
 
-API_VERSION: Final = "1.2.0"
+API_VERSION: Final = "1.3.0"
 _LOG_FORMAT: Final = "%(asctime)s %(levelname)s %(name)s %(message)s"
 
 
@@ -48,7 +48,8 @@ análise e devolve `{{"data", "meta"}}`: `meta` traz a fonte, o índice de preç
 
 **Valores:** `amount_nominal` está nos preços de cada mês; `amount_real` está em preços de
 dezembro de 2025, corrigido pelo IPCA (IBGE). Participações dentro de um ano usam valores
-nominais; totais de vários anos usam valores reais.
+nominais; totais de vários anos usam valores reais. Os rankings seguem a mesma regra: posição e
+participação pelo valor nominal quando o período é um ano só, pelo valor real quando são vários.
 
 **Período padrão:** 2017 a 2025 (série principal). Os valores aceitos em cada filtro estão
 em `GET /api/v1/metadata`.
@@ -59,8 +60,11 @@ mesmas linhas em CSV para planilhas em português (`;`, vírgula decimal, UTF-8 
 
 **Assistente:** `POST /api/v1/assistant/ask` responde perguntas em português usando as
 mesmas consultas das rotas, sem escrever SQL. O campo opcional `context` informa a página e
-os filtros em tela; a pergunta prevalece sobre ele. Até {settings.assistant_per_minute} perguntas
-por minuto e {settings.assistant_per_day} por dia por visitante.
+os filtros em tela, e `previous_question` a pergunta anterior, para perguntas de continuação
+("e o Ceará?"); a pergunta prevalece sobre os dois. Antes de sair, cada número da resposta é
+conferido com os dados consultados; se um não confere, a resposta é refeita uma vez e, se ainda
+não conferir, é retida. Até {settings.assistant_per_minute} perguntas por minuto e
+{settings.assistant_per_day} por dia por visitante.
 
 **Limites:** até {settings.rate_limit_per_minute} pedidos por minuto às rotas `/api/v1/`
 (0 = sem limite). Não há login.

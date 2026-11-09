@@ -72,7 +72,9 @@ class StateRank(_Row):
     amount_nominal: AmountNominal
     amount_real: AmountReal
     contracts: Contracts
-    share_pct: float | None = Field(description="Share of the period total, on real values.")
+    share_pct: float | None = Field(
+        description="Share of the period total: on nominal values for a single year, on real values for several."
+    )
 
 
 class MatopibaYear(_Row):
@@ -126,7 +128,9 @@ class ProgramRank(_Row):
     amount_nominal: AmountNominal
     amount_real: AmountReal
     contracts: Contracts
-    share_pct: float | None = Field(description="Share of the period total, on real values.")
+    share_pct: float | None = Field(
+        description="Share of the period total: on nominal values for a single year, on real values for several."
+    )
 
 
 class FundingSourceRank(_Row):
@@ -135,7 +139,9 @@ class FundingSourceRank(_Row):
     amount_nominal: AmountNominal
     amount_real: AmountReal
     contracts: Contracts
-    share_pct: float | None = Field(description="Share of the period total, on real values.")
+    share_pct: float | None = Field(
+        description="Share of the period total: on nominal values for a single year, on real values for several."
+    )
 
 
 class MonthShare(_Row):
@@ -232,10 +238,13 @@ class Metadata(BaseModel):
     assistant_available: bool = Field(description="False when no language model provider is configured.")
 
 
+QuestionText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=3, max_length=500)]
+
+
 class AskRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    question: Annotated[str, StringConstraints(strip_whitespace=True, min_length=3, max_length=500)] = Field(
+    question: QuestionText = Field(
         description="Question in Portuguese about rural credit in Brazil (3 to 500 characters)."
     )
     context: ScreenContext | None = Field(
@@ -243,6 +252,13 @@ class AskRequest(BaseModel):
         description=(
             "Page and filters on screen when the question was asked. Optional; it only fills what the "
             "question leaves open, and the question wins when they disagree."
+        ),
+    )
+    previous_question: QuestionText | None = Field(
+        default=None,
+        description=(
+            "The question the visitor asked just before, so a follow-up such as \"e o Ceará?\" can be "
+            "understood. Optional; the new question wins when they disagree."
         ),
     )
 

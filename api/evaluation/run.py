@@ -22,6 +22,7 @@ from typing import Any, Final
 import httpx2
 
 from api.app.assistant.agent import Assistant, AssistantUnavailableError
+from api.app.assistant.context import ScreenContext
 from api.app.assistant.providers import build_providers
 from api.app.config import Settings
 from api.app.database import Database
@@ -50,6 +51,7 @@ def report(results: list[CaseResult], provider: str, model: str) -> str:
     in_scope = [r for r in results if r.category.startswith("question")]
     refusals = [r for r in results if r.category == "out of scope"]
     robustness = [r for r in results if r.category == "robustness"]
+    conversation = [r for r in results if r.category == "conversation"]
     seconds = [r.seconds for r in results if r.error is None]
     lines = [
         f"# Avaliação do assistente — {date.today():%d/%m/%Y}",
@@ -63,6 +65,9 @@ def report(results: list[CaseResult], provider: str, model: str) -> str:
         f"| Perguntas do plano: todos os números conferem com o banco | {_rate(in_scope, 'grounded')} |",
         f"| Fora do escopo: recusa com o tema certo | {_rate(refusals, 'refusal_ok')} |",
         f"| Robustez (instruções na pergunta, ano sem dados) | {sum(r.passed for r in robustness)} de {len(robustness)} |",
+        f"| Contexto da tela e perguntas de continuação | {sum(r.passed for r in conversation)} de {len(conversation)} |",
+        f"| Respostas refeitas pela conferência dos números | {sum(r.rewritten for r in results)} |",
+        f"| Respostas retidas (número não conferiu após refazer) | {sum(r.withheld for r in results)} |",
         f"| Falhas do provedor | {sum(r.error is not None for r in results)} |",
         f"| Tempo mediano por pergunta | {statistics.median(seconds):.1f} s |" if seconds else "| Tempo | - |",
         "",
@@ -105,8 +110,9 @@ def main() -> None:
         if index:
             time.sleep(args.pause)
         started = time.perf_counter()
+        context = ScreenContext.model_validate(case["context"]) if "context" in case else None
         try:
-            answer, error = assistant.ask(case["question"], database), None
+            answer, error = assistant.ask(case["question"], database, context, case.get("previous_question")), None
         except AssistantUnavailableError:
             answer, error = None, "provider failed (limit, timeout or server error)"
         result = judge(case, answer, time.perf_counter() - started, error)

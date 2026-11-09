@@ -36,7 +36,7 @@ def ask(
     if not assistant.available:
         raise AssistantUnavailableError
     quota.consume(request.client.host if request.client else "unknown")
-    answer = assistant.ask(body.question, database, body.context)
+    answer = assistant.ask(body.question, database, body.context, body.previous_question)
     collected = [row["collected_at"] for row in database.fetch("loaded_years")]
     return AskResponse(
         meta=AssistantMeta(collected_at=max(collected, default=None)),

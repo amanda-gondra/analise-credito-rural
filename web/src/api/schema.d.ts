@@ -357,6 +357,11 @@ export interface components {
             question: string;
             /** @description Page and filters on screen when the question was asked. Optional; it only fills what the question leaves open, and the question wins when they disagree. */
             context?: components["schemas"]["ScreenContext"] | null;
+            /**
+             * Previous Question
+             * @description The question the visitor asked just before, so a follow-up such as "e o Ceará?" can be understood. Optional; the new question wins when they disagree.
+             */
+            previous_question?: string | null;
         };
         /** AskResponse */
         AskResponse: {
@@ -682,7 +687,7 @@ export interface components {
             contracts: number;
             /**
              * Share Pct
-             * @description Share of the period total, on real values.
+             * @description Share of the period total: on nominal values for a single year, on real values for several.
              */
             share_pct: number | null;
         };
@@ -879,7 +884,7 @@ export interface components {
             contracts: number;
             /**
              * Share Pct
-             * @description Share of the period total, on real values.
+             * @description Share of the period total: on nominal values for a single year, on real values for several.
              */
             share_pct: number | null;
         };
@@ -1023,7 +1028,7 @@ export interface components {
             contracts: number;
             /**
              * Share Pct
-             * @description Share of the period total, on real values.
+             * @description Share of the period total: on nominal values for a single year, on real values for several.
              */
             share_pct: number | null;
         };

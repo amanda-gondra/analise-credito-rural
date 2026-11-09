@@ -1,6 +1,9 @@
 /**
  * State of the Assistente de Dados, above the routes: the conversation survives navigation,
  * minimizing and closing; only "Limpar conversa" or a reload clears it.
+ *
+ * Each question goes with the screen context and with the question asked just before it, so a
+ * follow-up such as "e o Ceará?" can be understood (previous_question of POST /assistant/ask).
  */
 import { type ReactNode, createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router";
@@ -18,8 +21,8 @@ export interface Message {
   role: "user" | "assistant";
   text: string;
   response?: AskResponse;
-  /** For an assistant message that failed: what to show and the question to send again. */
-  error?: { text: string; question: string };
+  /** For an assistant message that failed: what to show, and the question to send again with its previous one. */
+  error?: { text: string; question: string; previous: string | null };
 }
 
 export type PanelState = "closed" | "open" | "minimized";
@@ -73,14 +76,16 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(false);
   const nextId = useRef(1);
   const pending = useRef<AbortController | null>(null);
+  const lastQuestion = useRef<string | null>(null);
 
   const context = useMemo(() => screenContext(location.pathname, location.search), [location.pathname, location.search]);
 
-  const send = useCallback((question: string, screen: ScreenContext) => {
+  const send = useCallback((question: string, screen: ScreenContext, previous: string | null) => {
     const controller = new AbortController();
     pending.current = controller;
     setLoading(true);
-    postJson<AskResponse>("/api/v1/assistant/ask", { question, context: screen }, controller.signal)
+    const body = { question, context: screen, ...(previous ? { previous_question: previous } : {}) };
+    postJson<AskResponse>("/api/v1/assistant/ask", body, controller.signal)
       .then((response) => {
         setMessages((list) => [...list, { id: nextId.current++, role: "assistant", text: response.answer, response }]);
       })
@@ -88,7 +93,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
         if (controller.signal.aborted) return;
         setMessages((list) => [
           ...list,
-          { id: nextId.current++, role: "assistant", text: "", error: { text: errorText(error), question } },
+          { id: nextId.current++, role: "assistant", text: "", error: { text: errorText(error), question, previous } },
         ]);
       })
       .finally(() => {
@@ -104,7 +109,9 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
       const question = raw.trim();
       if (pending.current || question.length < QUESTION_MIN || question.length > QUESTION_MAX) return;
       setMessages((list) => [...list, { id: nextId.current++, role: "user", text: question }]);
-      send(question, context);
+      const previous = lastQuestion.current;
+      lastQuestion.current = question;
+      send(question, context, previous);
     },
     [send, context],
   );
@@ -113,7 +120,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     (message: Message) => {
       if (pending.current || !message.error) return;
       setMessages((list) => list.filter((item) => item.id !== message.id));
-      send(message.error.question, context);
+      send(message.error.question, context, message.error.previous);
     },
     [send, context],
   );
@@ -121,6 +128,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   const clear = useCallback(() => {
     pending.current?.abort();
     pending.current = null;
+    lastQuestion.current = null;
     setLoading(false);
     setMessages([]);
   }, []);
