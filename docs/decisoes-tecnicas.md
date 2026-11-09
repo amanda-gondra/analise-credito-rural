@@ -135,6 +135,60 @@ Formato de cada registro: contexto, decisão, alternativas e justificativa. Hip�
 - **Versão 1.1:** tabelas já agregadas por município (município × ano × atividade × finalidade) e por instituição financeira (instituição × UF × ano × finalidade), a partir dos mesmos arquivos brutos. Estimativa: algumas centenas de milhares de linhas, dentro do limite gratuito do Neon.
 - **Versão 2:** inadimplência do crédito rural por UF (SCR.data, outra base do Banco Central; mede a dívida em aberto, conceito diferente do crédito concedido), encargos financeiros por programa e previsão dos próximos meses com teste em anos anteriores e margem de incerteza.
 
+### D20 — Contexto da tela nas perguntas ao assistente
+
+- **Decisão:** `POST /api/v1/assistant/ask` aceita o campo opcional `context` com a página e os filtros em tela (`page`, `state`, `states`, `region`, `activity`, `start_year`, `end_year`). Cada campo é validado contra as mesmas listas fechadas dos filtros das rotas (`extra="forbid"`), então a linha entregue ao modelo só contém palavras conhecidas, nunca texto livre.
+- **Regra do prompt (regra 8):** o contexto só preenche o que a pergunta deixa em aberto ("este estado", "no período"); o que a pergunta diz sempre prevalece, e a resposta nomeia o recorte que usou do contexto.
+- **Verificado em:** 08/11/2026. "Quanto foi para a pecuária?" com o contexto da página do Piauí em 2025 foi respondida para o Piauí em 2025, com a ferramenta `yearly_totals` e os filtros `state=PI`, `activity=livestock` e período 2025.
+- **Alternativa descartada:** mandar a URL da página. Ela pode trazer qualquer texto e exigiria interpretar parâmetros no prompt.
+
+### D21 — Linhas da base: paginação por chave e CSV
+
+- **Decisão:** `GET /api/v1/credit` devolve as linhas de `credit_monthly` na ordem da chave primária, com paginação por chave (o cursor é a chave da última linha, em base64url, validado como os demais parâmetros). `GET /api/v1/credit.csv` devolve as mesmas linhas para planilhas em português: `;` entre campos, vírgula decimal, UTF-8 com BOM, e apóstrofo antes de textos que começam com `=`, `+`, `-`, `@`, tabulação ou retorno de carro.
+- **Limites:** até 500 linhas por página; até 50.000 linhas por arquivo. Acima disso a API responde 422 `export_too_large` antes de ler as linhas. Contagem de 08/11/2026: a série 2017–2025 inteira tem 174.511 linhas; 2025 sozinho, 22.119; a maior UF na série principal (MG), 13.908.
+- **Justificativa:** com `OFFSET`, cada página seguinte custa mais e uma recarga da fonte pode pular ou repetir linhas. Com a chave, o PostgreSQL usa o índice da chave primária (plano verificado com `EXPLAIN ANALYZE` em 08/11/2026, a partir do meio da série: `Index Scan using credit_monthly_pkey`, execução em 2,7 ms no banco local).
+
+### D22 — Stack do site
+
+- **Decisão:** Vite 7, React 19, TypeScript 5.9, Tailwind CSS 4 (tokens em `@theme`), TanStack Query 5, React Router 7, Recharts 3, fonte Public Sans servida pelo próprio site. Tipos da API gerados do OpenAPI com `openapi-typescript`.
+- **Testes:** Vitest 5 com Testing Library (unidade e componentes) e Playwright usando o Chrome já instalado (canal `chrome`, sem baixar navegador), contra a API local e o banco carregado.
+
+### D23 — Identidade visual
+
+- **Logo:** a imagem oficial, só recortada nas margens brancas, com o fundo branco convertido em transparência (as cores e as proporções não mudam). Por isso o cabeçalho é branco: um cabeçalho escuro exigiria uma versão clara do logo, que seria redesenho. Favicon: o símbolo do próprio logo, recortado.
+- **Paleta de interface:** verde-floresta `#174B32` (ação principal, cabeçalho do assistente), azul-petróleo `#315B6B` (avisos informativos e pecuária), verde médio `#78A85A` só decorativo (contraste 2,78 no branco), fundo `#F7F8F4`, texto `#202923`, texto secundário `#5F6A63` (ajustado de `#69746D` para passar de 4,5:1 também sobre o fundo e as superfícies cinza). Sem roxo.
+- **Cores de dados:** agricultura `#4F7F2D` e pecuária `#315B6B` (diferença CIEDE2000 de 36,5 em deuteranopia); três rampas de seis classes com os mesmos passos de luminosidade OKLCH (total em verde-floresta, agricultura em verde-folha, pecuária em petróleo); paleta de categorias terracota, marrom, mostarda, grafite e vinho para finalidades, regiões e estados, nunca no mesmo gráfico que agricultura e pecuária, e sempre com o nome escrito na série. Validadas com o verificador de paletas e de contraste em 08/11/2026.
+
+### D24 — Mapa por UF
+
+- **Decisão:** malha de UFs do IBGE de 2022 (API de malhas v3, qualidade intermediária), simplificada sem separar fronteiras vizinhas e projetada na cônica equivalente de Albers (paralelos −2° e −22°), para que a área dos estados seja comparável. O arquivo é gerado por `web/scripts/build-uf-shapes.mjs` e versionado. Ilhas que somem na escala do mapa (como Fernando de Noronha) ficam de fora do desenho.
+- **Classes:** participação no total em seis classes fixas (menos de 0,5%; 0,5% a 1%; 1% a 2,5%; 2,5% a 5%; 5% a 10%; 10% ou mais), iguais para qualquer período e atividade.
+
+### D25 — Navegação e assistente em telas pequenas
+
+- **Navegação:** um único mecanismo. Abaixo de 1024 px, cabeçalho compacto com botão "Menu" que abre os links num painel lateral. Navegação inferior descartada: seis seções de uso parecido não justificam uma barra fixa que disputaria espaço com o botão do assistente.
+- **Assistente:** botão flutuante em todas as páginas, acima da área segura da tela. No computador mostra o nome; no celular é um círculo de 56 px com o nome como rótulo acessível. No computador o painel flutua sem bloquear a página; no celular é um painel inferior que acompanha a área visível (`visualViewport`), para o campo de digitação ficar acima do teclado também no Safari do iOS. A conversa sobrevive a fechar, minimizar e trocar de página.
+- **Filtros no celular:** botão "Filtros" com o número de filtros ativos, painel inferior com os controles e os filtros ativos como etiquetas removíveis. Os valores ficam na URL.
+
+### D26 — Uma base de valores por período (rankings e site)
+
+- **Decisão:** os rankings (`state_ranking`, `program_ranking`, `funding_source_ranking`) ordenam e calculam a participação pelo valor nominal quando o período é um ano só, e pelo valor corrigido quando são vários, como as demais participações (convenção de `sql/queries.sql`). O site mostra o mesmo valor que ordenou o ranking: "Valor concedido" (nominal) num ano só, "Valor corrigido" em vários anos, e deixa de mostrar somas e médias nominais de vários anos (em 2017–2025, o valor médio por contrato aparecia como R$ 134,9 mil nominais ao lado de R$ 163,3 mil corrigidos).
+- **Efeito medido (09/11/2026):** no ranking de estados de 2025, a participação muda no máximo 0,01 ponto percentual e nenhuma UF troca de posição. É coerência, não mudança de resultado.
+- **Contrato da API:** os campos continuam os mesmos; muda o cálculo de `share_pct` e de `position` num ano só (API 1.3.0).
+
+### D27 — Conferência dos números do assistente
+
+- **Decisão:** antes de uma resposta sair da API, cada número escrito nela precisa ser o arredondamento de um valor devolvido pelas ferramentas (`api/app/assistant/grounding.py`, as mesmas regras do conjunto de avaliação). Se um não for, o modelo refaz a resposta uma vez, sem ferramentas e com a lista dos números que não conferiram; se ainda houver um, a resposta é retida e o visitante recebe um texto fixo com o link do painel.
+- **Instruções:** uma base de valores por resposta (nominal num ano só, corrigido em vários) e nenhuma conta do modelo: somas, diferenças, médias, razões e porcentagens só quando vêm prontas de uma ferramenta.
+- **Não conferidos:** anos e números inteiros de 1 a 31 sem unidade (posição, quantidade de UFs, meses). Dinheiro, contratos e porcentagens sempre são conferidos.
+- **Alternativa descartada:** só reforçar as instruções. O modelo de linguagem não responde sempre igual, e uma regra no prompt não garante o número; a conferência no código garante que nenhum número fora dos dados chegue ao visitante.
+- **Custo:** uma chamada a mais ao modelo só quando a primeira resposta não confere.
+
+### D28 — Perguntas de continuação
+
+- **Decisão:** `POST /api/v1/assistant/ask` aceita o campo opcional `previous_question` (3 a 500 caracteres), que o site preenche com a pergunta anterior da conversa. O modelo a recebe numa linha própria antes da pergunta, sem quebras de linha nem colchetes, e só a usa para completar o que a pergunta nova deixa em aberto ("e o Ceará?", "e em 2024?"). A pergunta nova prevalece sobre a anterior, e a anterior sobre o contexto da tela.
+- **Alternativa descartada:** mandar a conversa inteira. Mais texto livre por pedido, mais custo de cota e mais espaço para instruções escondidas, sem ganho para as perguntas de continuação, que dependem só da anterior.
+
 ## Pendências
 
 | # | Pendência | Status | Impacto |
@@ -151,3 +205,7 @@ Formato de cada registro: contexto, decisão, alternativas e justificativa. Hip�
 | P10 | Último mês disponível em 2026 | Aberta | Só para análises parciais |
 | P11 | Tabela do IPCA no banco (estrutura e carga) | **Resolvida:** `ipca_monthly` no `schema.sql` e `pipeline/ipca.py` (fase 4) | — |
 | P12 | Criação dos usuários `loader` e `api_reader` | **Resolvida:** `sql/roles.sql` (fase 3) | — |
+| P13 | Limite de 60 pedidos por minuto por visitante | Aberta (fase 8) | Cada página do site faz de 5 a 8 pedidos; quem troca filtros muitas vezes em um minuto pode receber 429. Atrás do proxy do Render todos os visitantes chegam com o mesmo endereço: sem confiar no cabeçalho de encaminhamento do proxy, o limite (e a cota do assistente) vale para o site inteiro. Decidir o valor e a configuração na publicação |
+| P14 | Assistente misturando valores nominais e corrigidos numa mesma resposta e calculando participações | **Resolvida** (D27) | — |
+| P15 | Participação do ranking de um único ano calculada sobre valores corrigidos | **Resolvida** (D26) | — |
+| P16 | Links diretos para páginas do site publicado (`/estados/PI`) | Aberta (fase 8) | O site é uma aplicação de página única: o Vercel precisa devolver `index.html` para qualquer endereço do site |
