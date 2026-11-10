@@ -155,7 +155,7 @@ def test_openapi_documents_every_route_and_only_the_assistant_accepts_post(clien
         "/api/v1/states/ranking", "/api/v1/states/compare", "/api/v1/states/{uf}/profile",
         "/api/v1/regions/yearly", "/api/v1/regions/matopiba/yearly", "/api/v1/activities/yearly",
         "/api/v1/purposes/yearly", "/api/v1/programs/ranking", "/api/v1/funding-sources/ranking",
-        "/api/v1/assistant/ask", "/health",
+        "/api/v1/credit", "/api/v1/credit.csv", "/api/v1/assistant/ask", "/health",
     }
     methods = {path: set(operations) for path, operations in paths.items()}
     assert methods.pop("/api/v1/assistant/ask") == {"post"}

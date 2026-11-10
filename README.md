@@ -2,16 +2,18 @@
 
 Aplicação web para consultar o crédito rural no Brasil com dados oficiais do Banco Central: quanto é concedido, para onde vai e como mudou ao longo dos anos. Qualquer pessoa escolhe período, estado, atividade e finalidade e vê os números, os gráficos e a fonte.
 
-> **Status: Fase 6 concluída — API e assistente prontos.** Os dados de 2013 a 2025 são baixados do Banco Central, validados e carregados no PostgreSQL com reconciliação até o centavo; o IPCA do IBGE permite mostrar valores corrigidos; as 11 perguntas têm consultas SQL testadas contra o banco, uma API somente leitura que as publica e um assistente de IA avaliado com 35 perguntas. O site ainda não foi implementado.
+> **Status: Fase 7 concluída — site pronto, rodando localmente.** Os dados de 2013 a 2025 são baixados do Banco Central, validados e carregados no PostgreSQL com reconciliação até o centavo; o IPCA do IBGE permite mostrar valores corrigidos; as 11 perguntas têm consultas SQL testadas contra o banco, uma API somente leitura que as publica, um assistente de IA avaliado com 38 perguntas e um site em React, testado do celular de 320 px à tela de 1920 px. A publicação (fase 8) ainda não foi feita.
 
-## O que o site vai oferecer
+## O que o site oferece
 
-- **Visão geral do Brasil:** evolução anual, finalidades e agricultura × pecuária, em valores nominais e corrigidos pelo IPCA.
-- **Página por estado:** série, composição e posição no ranking.
-- **Comparar estados** e ver o **MATOPIBA** (Maranhão, Tocantins, Piauí e Bahia) como região.
-- **Explorar os dados:** filtros por ano, UF, atividade, finalidade e programa, com download em CSV.
-- **Pergunte aos dados:** um assistente de IA responde perguntas em português com os números do banco, a fonte e um link para o mesmo recorte no painel.
+- **Visão geral do Brasil:** mapa por estado, evolução anual, agricultura × pecuária, finalidades, sazonalidade e valor médio por contrato, em valores nominais e corrigidos pelo IPCA.
+- **Página por estado:** série, composição, programas, fontes de recursos e posição no ranking.
+- **Comparar** regiões ou estados e ver o **MATOPIBA** (Maranhão, Tocantins, Piauí e Bahia) como região.
+- **Explorar os dados:** filtros por ano, UF ou região, atividade, finalidade e programa, tabela paginada e download em CSV.
+- **Assistente de Dados:** responde perguntas em português com os números do banco, a data da coleta e um link para o mesmo recorte no painel; considera o que está na tela ("quanto foi para a pecuária?" na página do Piauí) e a pergunta anterior ("e o Ceará?"). Antes de responder, a API confere cada número com os dados consultados.
 - **Sobre os dados:** fonte, data da coleta, método e limitações.
+
+Os filtros ficam no endereço da página: um link copiado abre a mesma visão.
 
 ## Perguntas que o site responde
 
@@ -53,7 +55,7 @@ Arquivos do BCB → pipeline (Python) → PostgreSQL → API (FastAPI) → site 
 | Consultas | SQL — `sql/queries.sql` e a visão `credit_monthly_adjusted` | **Pronto e testado** |
 | API | FastAPI, Pydantic, SQLAlchemy Core — `api/` | **Pronto e testado** |
 | Assistente | Modelo de linguagem em plano gratuito (Gemini, com Groq e Cloudflare de reserva) e ferramentas sobre as consultas — `api/app/assistant/` | **Pronto e avaliado** |
-| Site | React, Vite, TypeScript | Planejado (fase 7) |
+| Site | React, Vite, TypeScript, Tailwind CSS, Vitest, Playwright — `web/` | **Pronto e testado** |
 | Publicação | Neon (banco), Render (API), Vercel (site), GitHub Actions | Planejado (fase 8) |
 
 Detalhes, rotas da API e segurança em [docs/arquitetura-aplicacao.md](docs/arquitetura-aplicacao.md).
@@ -69,12 +71,12 @@ Detalhes, rotas da API e segurança em [docs/arquitetura-aplicacao.md](docs/arqu
 | `tests/` | Testes automatizados (pytest) | Pronto |
 | `sql/queries.sql` | Uma consulta por pergunta, com valores nominais e corrigidos | Pronto e testado |
 | `api/` | API FastAPI somente leitura, com testes em `api/tests` | Pronto e testado |
-| `web/` | Site React | Planejado |
+| `web/` | Site React, com testes em `web/src` (Vitest) e `web/e2e` (Playwright) | Pronto e testado |
 | `data/` | Arquivos baixados (fora do Git) | Local |
 
 ## Rodar localmente
 
-Pré-requisitos: Docker e Python 3.12. Os comandos abaixo são do PowerShell, na pasta do projeto.
+Pré-requisitos: Docker, Python 3.12 e, para o site, Node.js 22 e o Google Chrome (usado pelos testes de navegador). Os comandos abaixo são do PowerShell, na pasta do projeto.
 
 ### 1. Banco de dados
 
@@ -115,24 +117,57 @@ O `pytest` roda os testes do pipeline e, com o banco no ar e carregado, também 
 .venv\Scripts\python -m uvicorn api.app.main:create_app --factory --port 8000
 ```
 
-A documentação interativa fica em http://127.0.0.1:8000/docs (o endereço sem `/docs` também leva até ela). Se aparecer `No module named 'api'`, o comando foi rodado fora da pasta do projeto; se `/health` responder `unavailable`, o Docker está desligado. A API conecta como `api_reader` (senha do `.env`), só lê, aceita `GET` (e `POST` apenas na rota do assistente) e limita a 60 pedidos por minuto por cliente. Exemplo: http://127.0.0.1:8000/api/v1/states/PI/profile mostra o perfil do Piauí de 2017 a 2025.
+A documentação interativa fica em http://127.0.0.1:8000/docs (o endereço sem `/docs` também leva até ela). Se aparecer `No module named 'api'`, o comando foi rodado fora da pasta do projeto; se `/health` responder `unavailable`, o Docker está desligado. A API conecta como `api_reader` (senha do `.env`), só lê, aceita `GET` (e `POST` apenas na rota do assistente) e limita a 60 pedidos por minuto por cliente. Exemplos: http://127.0.0.1:8000/api/v1/states/PI/profile mostra o perfil do Piauí de 2017 a 2025; http://127.0.0.1:8000/api/v1/credit.csv?state=PI&start_year=2025&end_year=2025 baixa as linhas do Piauí em 2025 num CSV que abre direto no Excel em português (até 50.000 linhas por arquivo).
 
 O `pytest` passa a rodar também os testes da API (`api/tests`): validação dos filtros, formato dos erros, CORS e limite de pedidos sem banco; e, com o banco carregado, se as rotas concordam entre si. Os testes do assistente usam provedores simulados: não chamam nenhum modelo nem precisam de chave.
 
 O assistente (`POST /api/v1/assistant/ask`) só responde com pelo menos uma chave gratuita no `.env` (`GEMINI_API_KEY`, `GROQ_API_KEY` ou `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_API_TOKEN`). Sem chave, ele responde 503 e o resto da API funciona normalmente. A chave do Gemini é criada no AI Studio num projeto **sem faturamento**, para continuar no plano gratuito.
 
-### 5. Avaliação do assistente
+### 5. Site
+
+Com a API do passo 4 no ar, em outro terminal:
+
+```powershell
+Set-Location web
+npm install
+npm run dev
+```
+
+O site abre em http://127.0.0.1:5173 e repassa os pedidos `/api` para a API em `127.0.0.1:8000`, sem configuração de CORS. Sem chave de modelo no `.env`, o Assistente de Dados avisa que está indisponível e o resto do site funciona.
+
+```powershell
+npm run typecheck   # TypeScript
+npm run lint        # ESLint
+npm test            # Vitest: formatação, filtros, mapa, cliente da API e assistente
+npm run build       # versão de produção em web/dist
+```
+
+Testes no navegador (Playwright, com o Chrome instalado): as 8 páginas em 7 tamanhos de tela, de 320×640 a 1920×1080, sem rolagem horizontal, e 9 fluxos (menu, filtros, assistente, tabela, CSV, mapa pelo teclado). Usam a API e o banco de verdade; só as respostas do assistente são simuladas, para não gastar cota. Como cada página faz vários pedidos e os testes rodam em paralelo, suba a API sem o limite de pedidos por minuto, só para isso:
+
+```powershell
+# terminal 1, na pasta do projeto
+$env:RATE_LIMIT_PER_MINUTE = "0"; .venv\Scripts\python -m uvicorn api.app.main:create_app --factory --port 8000
+# terminal 2, em web/
+npm run e2e
+```
+
+As capturas de tela ficam em `web/test-results/visual`. `npm run api:types` regenera `src/api/schema.d.ts` a partir do OpenAPI da API, e `npm run shapes` regenera o mapa a partir da malha do IBGE.
+
+### 6. Avaliação do assistente
 
 ```powershell
 .venv\Scripts\python -m api.evaluation.run --provider gemini
 ```
 
-Faz as 35 perguntas de `api/evaluation/cases.json` ao modelo real, com o banco local, e grava um relatório em `api/evaluation/reports/`. Cada caso confere três coisas: se o assistente usou a ferramenta e os filtros esperados; se cada número escrito na resposta é o arredondamento correto de um valor que veio do banco; e se as perguntas fora do escopo recebem a recusa do tema certo. Gasta cota gratuita, por isso não roda no `pytest`.
+Faz as 38 perguntas de `api/evaluation/cases.json` ao modelo real, com o banco local, e grava um relatório em `api/evaluation/reports/`. Cada caso confere três coisas: se o assistente usou a ferramenta e os filtros esperados; se cada número escrito na resposta é o arredondamento correto de um valor que veio do banco; e se as perguntas fora do escopo recebem a recusa do tema certo. Três casos testam o contexto da tela e as perguntas de continuação ("e o Ceará?"). Gasta cota gratuita, por isso não roda no `pytest`.
 
-| Rodada (06/11/2026, `gemini-3.5-flash-lite`) | Aprovados | Ferramenta certa | Números conferem | Recusas certas | Tempo mediano |
+| Rodada (`gemini-3.5-flash-lite`) | Aprovados | Ferramenta certa | Números conferem | Recusas certas | Tempo mediano |
 | --- | --- | --- | --- | --- | --- |
-| [1ª](api/evaluation/reports/2026-11-06-gemini-gemini-3.5-flash-lite-run1.md) | 31 de 35 | 24 de 24 | 22 de 24 | 6 de 7 | 2,4 s |
-| [2ª](api/evaluation/reports/2026-11-06-gemini-gemini-3.5-flash-lite-run2.md) | 35 de 35 | 25 de 25 | 25 de 25 | 7 de 7 | 2,5 s |
+| [1ª, 06/11/2026](api/evaluation/reports/2026-11-06-gemini-gemini-3.5-flash-lite-run1.md) | 31 de 35 | 24 de 24 | 22 de 24 | 6 de 7 | 2,4 s |
+| [2ª, 06/11/2026](api/evaluation/reports/2026-11-06-gemini-gemini-3.5-flash-lite-run2.md) | 35 de 35 | 25 de 25 | 25 de 25 | 7 de 7 | 2,5 s |
+| [3ª, 09/11/2026](api/evaluation/reports/2026-11-09-gemini-gemini-3.5-flash-lite.md) | 38 de 38 | 25 de 25 | 25 de 25 | 7 de 7 | 2,5 s |
+
+Na 3ª rodada a API já conferia cada número antes de responder (D27): uma resposta foi refeita pela conferência e nenhuma precisou ser retida. Os três casos de contexto e continuação passaram.
 
 Na 1ª rodada o modelo cortou uma casa decimal (66,5% em vez de 66,6%), somou por conta própria um total que não veio do banco (R$ 50,9 bi; o certo é R$ 51,07 bi) e classificou "previsão do tempo" como previsão de crédito; uma pergunta falhou por limite de pedidos do plano gratuito. Entre as rodadas, as instruções passaram a proibir somas feitas pelo modelo e a exigir arredondamento, e cada tema de recusa ganhou uma descrição. As mudanças são gerais, mas a 2ª rodada usou as mesmas perguntas, e um modelo de linguagem não responde sempre igual: o resultado é uma medida deste conjunto, não uma garantia.
 
@@ -144,7 +179,7 @@ Na 1ª rodada o modelo cortou uma casa decimal (66,5% em vez de 66,6%), somou po
 4. **Consultas SQL** e série do IPCA — concluída
 5. **API** FastAPI com testes — concluída
 6. **Assistente de IA** com ferramentas fechadas e avaliação — concluída
-7. **Site** React
+7. **Site** React com o Assistente de Dados — concluída
 8. **Publicação** e integração contínua
 
 ## Documentação
@@ -167,7 +202,8 @@ Na 1ª rodada o modelo cortou uma casa decimal (66,5% em vez de 66,6%), somou po
 - A fonte é revisada diariamente; os números dependem da data de coleta.
 - Antes de 2017 a série não é comparável.
 - O MATOPIBA é aproximado pelos quatro estados inteiros.
-- No plano gratuito, a API leva cerca de um minuto para responder depois de um período sem acessos.
+- No plano gratuito, a API leva cerca de um minuto para responder depois de um período sem acessos; o site avisa quando a resposta demora.
+- O CSV aceita até 50.000 linhas por arquivo; a série inteira do país passa disso e precisa ser baixada por período ou por filtro.
 
 ## Referências
 

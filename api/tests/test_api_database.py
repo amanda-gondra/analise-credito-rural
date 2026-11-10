@@ -94,3 +94,31 @@ def test_matopiba_and_seasonality_answer(api):
     assert sorted(row["state"] or "bloc" for row in matopiba) == ["BA", "MA", "PI", "TO", "bloc"]
     assert [row["month"] for row in months] == list(range(1, 13))
     assert sum(row["avg_share_pct"] for row in months) == pytest.approx(100, abs=0.2)
+
+
+def test_explorer_pages_and_csv_agree_with_the_totals(api):
+    filters = {"state": "PI", "activity": "livestock", "start_year": 2024, "end_year": 2024}
+    total = api.get("/api/v1/totals/yearly", params=filters).json()["data"][0]
+
+    rows, cursor = [], None
+    while True:
+        params = {**filters, "limit": 500, **({"cursor": cursor} if cursor else {})}
+        body = api.get("/api/v1/credit", params=params).json()
+        rows.extend(body["data"])
+        cursor = body["page"]["next_cursor"]
+        if cursor is None:
+            break
+    csv = api.get("/api/v1/credit.csv", params=filters)
+
+    assert body["summary"]["rows"] == len(rows)
+    assert body["summary"]["contracts"] == total["contracts"]
+    assert sum(row["amount_nominal"] for row in rows) == pytest.approx(total["amount_nominal"], abs=CENTS)
+    assert csv.status_code == 200
+    assert csv.content.decode("utf-8-sig").count("\r\n") == len(rows) + 1  # header and rows
+
+
+def test_the_csv_of_the_whole_country_over_the_main_series_is_refused(api):
+    response = api.get("/api/v1/credit.csv")
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "export_too_large"

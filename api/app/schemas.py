@@ -17,6 +17,7 @@ from typing import Annotated, Any, Final, Generic, Literal, TypeVar
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StringConstraints
 
+from api.app.assistant.context import ScreenContext
 from api.app.filters import ACTIVITY_BY_CODE, PRICE_BASE, Activity, Region
 
 SOURCE: Final = "Banco Central do Brasil, Matriz de Dados do Crédito Rural (MDCR)"
@@ -71,7 +72,9 @@ class StateRank(_Row):
     amount_nominal: AmountNominal
     amount_real: AmountReal
     contracts: Contracts
-    share_pct: float | None = Field(description="Share of the period total, on real values.")
+    share_pct: float | None = Field(
+        description="Share of the period total: on nominal values for a single year, on real values for several."
+    )
 
 
 class MatopibaYear(_Row):
@@ -125,7 +128,9 @@ class ProgramRank(_Row):
     amount_nominal: AmountNominal
     amount_real: AmountReal
     contracts: Contracts
-    share_pct: float | None = Field(description="Share of the period total, on real values.")
+    share_pct: float | None = Field(
+        description="Share of the period total: on nominal values for a single year, on real values for several."
+    )
 
 
 class FundingSourceRank(_Row):
@@ -134,7 +139,9 @@ class FundingSourceRank(_Row):
     amount_nominal: AmountNominal
     amount_real: AmountReal
     contracts: Contracts
-    share_pct: float | None = Field(description="Share of the period total, on real values.")
+    share_pct: float | None = Field(
+        description="Share of the period total: on nominal values for a single year, on real values for several."
+    )
 
 
 class MonthShare(_Row):
@@ -152,6 +159,42 @@ class AverageContract(_Row):
     contracts: Contracts
     average_nominal: float | None = Field(description="Amount / contracts; null without contracts.")
     average_real: float | None = Field(description="Same, at December 2025 prices.")
+
+
+class CreditRow(_Row):
+    """One row of credit_monthly: month x UF x activity x program x subprogram x funding source x purpose."""
+
+    year: YearColumn
+    month: int = Field(validation_alias="reference_month")
+    state: str = Field(validation_alias="state_abbr")
+    region: RegionColumn
+    activity: ActivityColumn
+    purpose: str
+    program: str = Field(validation_alias="program_name", description="As published by the source.")
+    subprogram: str = Field(validation_alias="subprogram_name", description="As published by the source.")
+    funding_source: str = Field(validation_alias="funding_source_name", description="As published by the source.")
+    contracts: Contracts = Field(validation_alias="contract_count")
+    amount_nominal: AmountNominal
+    amount_real: AmountReal
+
+
+class CreditPageInfo(BaseModel):
+    limit: int = Field(description="Rows per page asked for.")
+    next_cursor: str | None = Field(description="Pass as cursor to get the next page; null on the last page.")
+    csv_max_rows: int = Field(description="Most rows /api/v1/credit.csv accepts; narrow the filters above it.")
+
+
+class CreditSummary(BaseModel):
+    rows: int = Field(validation_alias="row_count", description="Rows the filters select, in every page.")
+    contracts: Contracts
+    amount_real: float = Field(description="Total of the selection at December 2025 prices (IPCA).")
+
+
+class CreditPage(BaseModel):
+    data: list[CreditRow]
+    meta: Meta
+    page: CreditPageInfo
+    summary: CreditSummary
 
 
 class StateProfile(BaseModel):
@@ -195,11 +238,28 @@ class Metadata(BaseModel):
     assistant_available: bool = Field(description="False when no language model provider is configured.")
 
 
+QuestionText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=3, max_length=500)]
+
+
 class AskRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    question: Annotated[str, StringConstraints(strip_whitespace=True, min_length=3, max_length=500)] = Field(
+    question: QuestionText = Field(
         description="Question in Portuguese about rural credit in Brazil (3 to 500 characters)."
+    )
+    context: ScreenContext | None = Field(
+        default=None,
+        description=(
+            "Page and filters on screen when the question was asked. Optional; it only fills what the "
+            "question leaves open, and the question wins when they disagree."
+        ),
+    )
+    previous_question: QuestionText | None = Field(
+        default=None,
+        description=(
+            "The question the visitor asked just before, so a follow-up such as \"e o Ceará?\" can be "
+            "understood. Optional; the new question wins when they disagree."
+        ),
     )
 
 

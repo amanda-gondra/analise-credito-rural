@@ -50,7 +50,8 @@ ORDER BY reference_year;
 -- name: state_ranking
 -- Question 2: which states receive the most?
 -- Parameters: :first_year, :last_year (required); :activity_code, :purpose (optional).
--- One row per UF, ordered by the real amount of the period (comparable across years).
+-- One row per UF. Position and share follow the conventions: nominal values when the
+-- period is a single year, real values when it adds several years.
 WITH by_state AS (
     SELECT
         state_abbr,
@@ -63,16 +64,23 @@ WITH by_state AS (
       AND (CAST(:activity_code AS CHAR(1)) IS NULL OR activity_code = CAST(:activity_code AS CHAR(1)))
       AND (CAST(:purpose AS TEXT) IS NULL OR purpose = CAST(:purpose AS TEXT))
     GROUP BY state_abbr, region_name
+),
+based AS (
+    SELECT
+        by_state.*,
+        CASE WHEN CAST(:first_year AS SMALLINT) = CAST(:last_year AS SMALLINT)
+             THEN amount_nominal ELSE amount_real END AS amount_base
+    FROM by_state
 )
 SELECT
-    RANK() OVER (ORDER BY amount_real DESC) AS position,
+    RANK() OVER (ORDER BY amount_base DESC) AS position,
     state_abbr,
     region_name,
     ROUND(amount_nominal, 2) AS amount_nominal,
     ROUND(amount_real, 2)    AS amount_real,
     contracts,
-    ROUND(100 * amount_real / NULLIF(SUM(amount_real) OVER (), 0), 2) AS share_pct
-FROM by_state
+    ROUND(100 * amount_base / NULLIF(SUM(amount_base) OVER (), 0), 2) AS share_pct
+FROM based
 ORDER BY position, state_abbr;
 
 
@@ -256,8 +264,9 @@ ORDER BY reference_year, region_name;
 -- name: program_ranking
 -- Question 8: which programs concentrate the credit?
 -- Parameters: :first_year, :last_year (required); :state_abbr (optional).
--- One row per program, ordered by the real amount of the period. Names as published
--- by the source; grouping the smaller ones into "Outros" is a presentation choice of the site.
+-- One row per program; position and share as in state_ranking (nominal for a single
+-- year, real for several). Names as published by the source; grouping the smaller ones
+-- into "Outros" is a presentation choice of the site.
 WITH by_program AS (
     SELECT
         program_name,
@@ -268,22 +277,30 @@ WITH by_program AS (
     WHERE reference_year BETWEEN :first_year AND :last_year
       AND (CAST(:state_abbr AS CHAR(2)) IS NULL OR state_abbr = CAST(:state_abbr AS CHAR(2)))
     GROUP BY program_name
+),
+based AS (
+    SELECT
+        by_program.*,
+        CASE WHEN CAST(:first_year AS SMALLINT) = CAST(:last_year AS SMALLINT)
+             THEN amount_nominal ELSE amount_real END AS amount_base
+    FROM by_program
 )
 SELECT
-    RANK() OVER (ORDER BY amount_real DESC) AS position,
+    RANK() OVER (ORDER BY amount_base DESC) AS position,
     program_name,
     ROUND(amount_nominal, 2) AS amount_nominal,
     ROUND(amount_real, 2)    AS amount_real,
     contracts,
-    ROUND(100 * amount_real / NULLIF(SUM(amount_real) OVER (), 0), 2) AS share_pct
-FROM by_program
+    ROUND(100 * amount_base / NULLIF(SUM(amount_base) OVER (), 0), 2) AS share_pct
+FROM based
 ORDER BY position, program_name;
 
 
 -- name: funding_source_ranking
 -- Question 9: where do the resources come from?
 -- Parameters: :first_year, :last_year (required); :state_abbr (optional).
--- One row per funding source, ordered by the real amount of the period.
+-- One row per funding source; position and share as in state_ranking (nominal for a
+-- single year, real for several).
 WITH by_source AS (
     SELECT
         funding_source_name,
@@ -294,15 +311,22 @@ WITH by_source AS (
     WHERE reference_year BETWEEN :first_year AND :last_year
       AND (CAST(:state_abbr AS CHAR(2)) IS NULL OR state_abbr = CAST(:state_abbr AS CHAR(2)))
     GROUP BY funding_source_name
+),
+based AS (
+    SELECT
+        by_source.*,
+        CASE WHEN CAST(:first_year AS SMALLINT) = CAST(:last_year AS SMALLINT)
+             THEN amount_nominal ELSE amount_real END AS amount_base
+    FROM by_source
 )
 SELECT
-    RANK() OVER (ORDER BY amount_real DESC) AS position,
+    RANK() OVER (ORDER BY amount_base DESC) AS position,
     funding_source_name,
     ROUND(amount_nominal, 2) AS amount_nominal,
     ROUND(amount_real, 2)    AS amount_real,
     contracts,
-    ROUND(100 * amount_real / NULLIF(SUM(amount_real) OVER (), 0), 2) AS share_pct
-FROM by_source
+    ROUND(100 * amount_base / NULLIF(SUM(amount_base) OVER (), 0), 2) AS share_pct
+FROM based
 ORDER BY position, funding_source_name;
 
 
@@ -380,6 +404,74 @@ SELECT
     ROUND(amount_real / NULLIF(contracts, 0), 2)    AS average_real
 FROM totals
 ORDER BY reference_year NULLS LAST;
+
+
+-- =============================================================================
+-- Data explorer (GET /api/v1/credit and /api/v1/credit.csv): the rows themselves.
+-- Same filters as question 11. Rows come in the order of the primary key of
+-- credit_monthly, so a page continues after the key of the last row of the previous
+-- one (keyset pagination): every page costs the same, and a row is never skipped or
+-- repeated because of an offset.
+-- =============================================================================
+
+
+-- name: credit_rows
+-- Parameters: :first_year, :last_year, :row_limit (required);
+--             :state_abbr, :region_name, :activity_code, :purpose, :program_name (optional);
+--             :after_year, :after_month, :after_state, :after_activity, :after_program,
+--             :after_subprogram, :after_funding_source, :after_purpose: the key of the last
+--             row already shown, all NULL for the first page.
+-- One row per month x UF x activity x program x subprogram x funding source x purpose.
+SELECT
+    reference_year,
+    reference_month,
+    state_abbr,
+    region_name,
+    activity_code,
+    purpose,
+    program_name,
+    subprogram_name,
+    funding_source_name,
+    contract_count,
+    credit_amount                AS amount_nominal,
+    ROUND(credit_amount_real, 2) AS amount_real
+FROM credit_monthly_adjusted
+WHERE reference_year BETWEEN :first_year AND :last_year
+  AND (CAST(:state_abbr AS CHAR(2)) IS NULL OR state_abbr = CAST(:state_abbr AS CHAR(2)))
+  AND (CAST(:region_name AS TEXT) IS NULL OR region_name = CAST(:region_name AS TEXT))
+  AND (CAST(:activity_code AS CHAR(1)) IS NULL OR activity_code = CAST(:activity_code AS CHAR(1)))
+  AND (CAST(:purpose AS TEXT) IS NULL OR purpose = CAST(:purpose AS TEXT))
+  AND (CAST(:program_name AS TEXT) IS NULL OR program_name = CAST(:program_name AS TEXT))
+  AND (
+      CAST(:after_year AS SMALLINT) IS NULL
+      OR (reference_year, reference_month, state_abbr, activity_code,
+          program_name, subprogram_name, funding_source_name, purpose)
+       > (CAST(:after_year AS SMALLINT), CAST(:after_month AS SMALLINT),
+          CAST(:after_state AS CHAR(2)), CAST(:after_activity AS CHAR(1)),
+          CAST(:after_program AS TEXT), CAST(:after_subprogram AS TEXT),
+          CAST(:after_funding_source AS TEXT), CAST(:after_purpose AS TEXT))
+  )
+ORDER BY reference_year, reference_month, state_abbr, activity_code,
+         program_name, subprogram_name, funding_source_name, purpose
+LIMIT :row_limit;
+
+
+-- name: credit_summary
+-- Parameters: the filters of credit_rows, without the key and the limit.
+-- How many rows the filters select, with their contracts and their total at December 2025
+-- prices (real values, because the rows may span several years).
+-- An empty selection has 0 rows, 0 contracts and R$ 0, not NULL.
+SELECT
+    COUNT(*)                                       AS row_count,
+    COALESCE(SUM(contract_count), 0)               AS contracts,
+    COALESCE(ROUND(SUM(credit_amount_real), 2), 0) AS amount_real
+FROM credit_monthly_adjusted
+WHERE reference_year BETWEEN :first_year AND :last_year
+  AND (CAST(:state_abbr AS CHAR(2)) IS NULL OR state_abbr = CAST(:state_abbr AS CHAR(2)))
+  AND (CAST(:region_name AS TEXT) IS NULL OR region_name = CAST(:region_name AS TEXT))
+  AND (CAST(:activity_code AS CHAR(1)) IS NULL OR activity_code = CAST(:activity_code AS CHAR(1)))
+  AND (CAST(:purpose AS TEXT) IS NULL OR purpose = CAST(:purpose AS TEXT))
+  AND (CAST(:program_name AS TEXT) IS NULL OR program_name = CAST(:program_name AS TEXT));
 
 
 -- =============================================================================
