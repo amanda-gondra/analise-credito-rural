@@ -1,0 +1,42 @@
+# Render Blueprint: the API as a free web service (decisions D15 and D32).
+# Secrets are never written here: entries with "sync: false" are asked for in the Render
+# dashboard when the Blueprint is created. Python comes from .python-version.
+
+services:
+  - type: web
+    name: analise-credito-rural-api
+    runtime: python
+    plan: free
+    # Same AWS region as the Neon database (US East, N. Virginia): every page asks the
+    # database several questions, so the API and the database must be close to each other.
+    region: virginia
+    branch: main
+    buildCommand: pip install -r api/requirements.txt
+    # --no-proxy-headers: the visitor comes from CLIENT_IP_HEADER, never from X-Forwarded-For (D31).
+    startCommand: uvicorn api.app.main:create_app --factory --host 0.0.0.0 --port $PORT --no-proxy-headers --no-server-header
+    healthCheckPath: /health
+    # Deploy a commit of main only after the GitHub Actions checks pass on it.
+    autoDeployTrigger: checksPass
+    buildFilter:
+      paths:
+        - api/**
+        - sql/**
+        - render.yaml
+        - .python-version
+      ignoredPaths:
+        - api/tests/**
+        - api/evaluation/**
+    envVars:
+      # Read-only role on Neon (sql/roles.sql), direct connection (not the pooler).
+      - key: DATABASE_URL_READER
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: ALLOWED_ORIGINS
+        value: https://analise-credito-rural.vercel.app
+      # Cloudflare, in front of Render, writes the visitor's address here on every request.
+      - key: CLIENT_IP_HEADER
+        value: CF-Connecting-IP
+      # A page of the site makes 5 to 8 requests; 120 leaves room to change filters (P13).
+      - key: RATE_LIMIT_PER_MINUTE
+        value: "120"

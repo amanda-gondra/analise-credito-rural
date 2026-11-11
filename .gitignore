@@ -7,8 +7,10 @@
 __pycache__/
 *.py[cod]
 
-# Local credentials
+# Local credentials (.env) and those of the published services (.env.production)
 .env
+.env.*
+!.env.example
 
 # Jupyter
 .ipynb_checkpoints/
