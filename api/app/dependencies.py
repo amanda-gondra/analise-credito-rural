@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from api.app.assistant.agent import Assistant
 from api.app.assistant.quota import AssistantQuota
+from api.app.client_ip import ClientResolver
 from api.app.database import QueryRunner
 from api.app.schemas import Meta
 
@@ -28,9 +29,16 @@ def get_quota(request: Request) -> AssistantQuota:
     return quota
 
 
+def get_client_key(request: Request) -> str:
+    """The visitor, by the same rule as the request limit (api/app/client_ip.py)."""
+    resolver: ClientResolver = request.app.state.client_resolver
+    return resolver.key(request.scope)
+
+
 DatabaseDep = Annotated[QueryRunner, Depends(get_database)]
 AssistantDep = Annotated[Assistant, Depends(get_assistant)]
 QuotaDep = Annotated[AssistantQuota, Depends(get_quota)]
+ClientKeyDep = Annotated[str, Depends(get_client_key)]
 
 
 def envelope(data: Any, filters: BaseModel, **extra_filters: Any) -> dict[str, Any]:

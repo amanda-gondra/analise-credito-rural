@@ -7,10 +7,10 @@ The answer comes with the rows it was written from and the page of the panel to 
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter
 
 from api.app.assistant.agent import AssistantUnavailableError
-from api.app.dependencies import AssistantDep, DatabaseDep, QuotaDep
+from api.app.dependencies import AssistantDep, ClientKeyDep, DatabaseDep, QuotaDep
 from api.app.errors import ErrorResponse
 from api.app.schemas import AskRequest, AskResponse, AssistantMeta, AssistantSource
 
@@ -28,14 +28,14 @@ router = APIRouter(prefix="/api/v1/assistant", tags=["assistant"])
 )
 def ask(
     body: AskRequest,
-    request: Request,
     database: DatabaseDep,
     assistant: AssistantDep,
     quota: QuotaDep,
+    visitor: ClientKeyDep,
 ) -> AskResponse:
     if not assistant.available:
         raise AssistantUnavailableError
-    quota.consume(request.client.host if request.client else "unknown")
+    quota.consume(visitor)
     answer = assistant.ask(body.question, database, body.context, body.previous_question)
     collected = [row["collected_at"] for row in database.fetch("loaded_years")]
     return AskResponse(

@@ -28,6 +28,7 @@ from fastapi.responses import RedirectResponse
 from api.app.assistant.agent import Assistant
 from api.app.assistant.providers import build_providers
 from api.app.assistant.quota import AssistantQuota
+from api.app.client_ip import ClientResolver
 from api.app.config import Settings, get_settings
 from api.app.database import Database, QueryRunner
 from api.app.errors import register_exception_handlers
@@ -122,6 +123,8 @@ def create_app(
     app.state.assistant_quota = AssistantQuota(
         settings.assistant_per_minute, settings.assistant_per_day, settings.assistant_global_per_day
     )
+    # One rule for "who is the visitor", shared by the request limit and the assistant quota.
+    app.state.client_resolver = ClientResolver(settings.client_ip_header)
 
     register_exception_handlers(app)
     for router in (
@@ -143,7 +146,11 @@ def create_app(
 
     # add_middleware puts each new middleware outside the previous ones.
     app.add_middleware(RequestBodyLimitMiddleware, max_body_bytes=settings.max_request_body_bytes)
-    app.add_middleware(RateLimitMiddleware, requests_per_minute=settings.rate_limit_per_minute)
+    app.add_middleware(
+        RateLimitMiddleware,
+        requests_per_minute=settings.rate_limit_per_minute,
+        client_key=app.state.client_resolver.key,
+    )
     app.add_middleware(RequestContextMiddleware)
     app.add_middleware(
         CORSMiddleware,

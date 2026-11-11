@@ -11,6 +11,8 @@ Variables:
     DB_POOL_SIZE            connections kept open; api_reader accepts at most 10 (sql/roles.sql)
     ALLOWED_ORIGINS         comma-separated origins allowed by CORS (none by default)
     RATE_LIMIT_PER_MINUTE   requests per client per minute to /api/v1/ (0: no limit)
+    CLIENT_IP_HEADER        header the host's proxy writes with the visitor's address, e.g.
+                            CF-Connecting-IP on Render (empty: the connection address; D31)
     QUERIES_FILE            path of sql/queries.sql (default: the file of this repository)
     LOG_LEVEL               logging level
 
@@ -27,6 +29,7 @@ Assistant (decision D18). Only providers with credentials are used, in this orde
 
 from __future__ import annotations
 
+import re
 from functools import cache
 from pathlib import Path
 from typing import Annotated, Final, Literal
@@ -40,6 +43,8 @@ ProviderName = Literal["gemini", "groq", "cloudflare"]
 DEFAULT_QUERIES_FILE: Final = Path(__file__).resolve().parents[2] / "sql" / "queries.sql"
 # Hosts such as Neon give "postgresql://" URLs; SQLAlchemy needs the driver in the scheme.
 _DRIVER_SCHEMES: Final = ("postgres://", "postgresql://")
+_HEADER_NAME: Final = re.compile(r"[A-Za-z0-9-]+")
+_FORGEABLE_HEADERS: Final = frozenset({"x-forwarded-for", "forwarded", "x-real-ip"})
 
 
 class Settings(BaseSettings):
@@ -55,6 +60,7 @@ class Settings(BaseSettings):
     db_pool_size: int = Field(default=5, ge=1, le=10)
     allowed_origins: Annotated[list[str], NoDecode] = Field(default_factory=list)
     rate_limit_per_minute: int = Field(default=60, ge=0)
+    client_ip_header: str | None = None
     queries_file: Path = DEFAULT_QUERIES_FILE
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
 
@@ -90,6 +96,19 @@ class Settings(BaseSettings):
     def _empty_is_none(cls, value: object) -> object:
         # An empty variable in .env or on the host means "not set", not an empty password.
         return None if value == "" else value
+
+    @field_validator("client_ip_header", mode="before")
+    @classmethod
+    def _check_client_ip_header(cls, value: object) -> object:
+        if value is None or (isinstance(value, str) and value.strip() == ""):
+            return None
+        if not isinstance(value, str) or not _HEADER_NAME.fullmatch(value.strip()):
+            raise ValueError("CLIENT_IP_HEADER must be a header name, e.g. CF-Connecting-IP")
+        name = value.strip().lower()
+        if name in _FORGEABLE_HEADERS:
+            # The visitor writes the start of these headers (see api/app/client_ip.py).
+            raise ValueError(f"CLIENT_IP_HEADER cannot be {value.strip()}: the visitor can forge it")
+        return name
 
     @field_validator("allowed_origins", mode="before")
     @classmethod
