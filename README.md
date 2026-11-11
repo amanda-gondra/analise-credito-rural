@@ -56,7 +56,7 @@ Arquivos do BCB → pipeline (Python) → PostgreSQL → API (FastAPI) → site 
 | API | FastAPI, Pydantic, SQLAlchemy Core — `api/` | **Pronto e testado** |
 | Assistente | Modelo de linguagem em plano gratuito (Gemini, com Groq e Cloudflare de reserva) e ferramentas sobre as consultas — `api/app/assistant/` | **Pronto e avaliado** |
 | Site | React, Vite, TypeScript, Tailwind CSS, Vitest, Playwright — `web/` | **Pronto e testado** |
-| Publicação | Neon (banco), Render (API), Vercel (site), GitHub Actions | Planejado (fase 8) |
+| Publicação | Neon (banco), Render (API), Vercel (site), GitHub Actions | Em andamento (fase 8) |
 
 Detalhes, rotas da API e segurança em [docs/arquitetura-aplicacao.md](docs/arquitetura-aplicacao.md).
 
@@ -76,7 +76,7 @@ Detalhes, rotas da API e segurança em [docs/arquitetura-aplicacao.md](docs/arqu
 
 ## Rodar localmente
 
-Pré-requisitos: Docker, Python 3.12 e, para o site, Node.js 22 e o Google Chrome (usado pelos testes de navegador). Os comandos abaixo são do PowerShell, na pasta do projeto.
+Pré-requisitos: Docker, Python 3.14 e, para o site, Node.js 22 e o Google Chrome (usado pelos testes de navegador). Os comandos abaixo são do PowerShell, na pasta do projeto.
 
 ### 1. Banco de dados
 
@@ -170,6 +170,51 @@ Faz as 38 perguntas de `api/evaluation/cases.json` ao modelo real, com o banco l
 Na 3ª rodada a API já conferia cada número antes de responder (D27): uma resposta foi refeita pela conferência e nenhuma precisou ser retida. Os três casos de contexto e continuação passaram.
 
 Na 1ª rodada o modelo cortou uma casa decimal (66,5% em vez de 66,6%), somou por conta própria um total que não veio do banco (R$ 50,9 bi; o certo é R$ 51,07 bi) e classificou "previsão do tempo" como previsão de crédito; uma pergunta falhou por limite de pedidos do plano gratuito. Entre as rodadas, as instruções passaram a proibir somas feitas pelo modelo e a exigir arredondamento, e cada tema de recusa ganhou uma descrição. As mudanças são gerais, mas a 2ª rodada usou as mesmas perguntas, e um modelo de linguagem não responde sempre igual: o resultado é uma medida deste conjunto, não uma garantia.
+
+## Publicação
+
+| Peça | Serviço (plano gratuito) | Configuração |
+| --- | --- | --- |
+| Banco | Neon, AWS US East (N. Virginia), PostgreSQL 16 | `scripts/setup_remote_database.py` e o pipeline |
+| API | Render, região Virginia | `render.yaml` (Blueprint) e `.python-version` |
+| Site | Vercel | `web/vercel.json`: rotas do site e cabeçalhos de segurança |
+| Verificação | GitHub Actions | `.github/workflows/ci.yml`: testes da API, do pipeline e do site a cada push |
+
+Banco e API ficam na mesma região porque cada página faz várias consultas; o Neon tem São Paulo, mas o Render não. O Render só publica um commit da `main` depois que o GitHub Actions passa nele. Os nomes `analise-credito-rural` (Vercel) e `analise-credito-rural-api` (Render) aparecem em `render.yaml` e em `web/vercel.json`; outro nome exige trocar os dois arquivos. Decisões em D15, D31 e D32.
+
+As senhas e endereços do banco publicado ficam em `.env.production`, fora do Git, e nos painéis do Render e do GitHub. Nenhum segredo fica no código.
+
+### 1. Banco (Neon)
+
+No Neon, crie o projeto em **AWS US East 1 (N. Virginia)** com PostgreSQL 16. Em **Connect**, desligue **Connection pooling** e copie o endereço de conexão para `.env.production`, na pasta do projeto, numa linha `NEON_OWNER_URL=...`. Depois, com o Docker ligado:
+
+```powershell
+.venv\Scripts\python scripts\setup_remote_database.py
+```
+
+O script cria as tabelas (`sql/schema.sql`) e os usuários `loader` e `api_reader` (`sql/roles.sql`) no Neon, gera as senhas deles sem mostrá-las e grava em `.env.production` os endereços `DATABASE_URL` (carga) e `DATABASE_URL_READER` (leitura, para o Render). Pode ser executado de novo: mantém as senhas e não recria as tabelas. A carga usa o mesmo pipeline do banco local, só que apontado para o Neon nesta sessão do terminal:
+
+```powershell
+Get-Content .env.production | Where-Object { $_ -match '^DATABASE_URL(_READER)?=' } | ForEach-Object { $k, $v = $_ -split '=', 2; Set-Item "env:$k" $v }
+.venv\Scripts\python -m pipeline.load 2013 2025
+.venv\Scripts\python -m pipeline.ipca
+.venv\Scripts\python -m pytest            # testes das consultas e da API contra o Neon, como api_reader
+Remove-Item env:DATABASE_URL, env:DATABASE_URL_READER   # o terminal volta a usar o banco local
+```
+
+### 2. API (Render)
+
+No Render, **New → Blueprint**, escolha este repositório e confirme o `render.yaml`. O painel pede dois segredos: `DATABASE_URL_READER` (de `.env.production`) e `GEMINI_API_KEY`. As chaves de reserva (`GROQ_API_KEY`, `CLOUDFLARE_ACCOUNT_ID` e `CLOUDFLARE_API_TOKEN`) podem ser acrescentadas depois em **Environment**. A API fica em `https://analise-credito-rural-api.onrender.com`; `/health` deve responder `{"status":"ok","database":"ok"}`.
+
+O limite por visitante usa o cabeçalho `CF-Connecting-IP`, que o Cloudflare, na frente do Render, escreve em todo pedido; o `X-Forwarded-For` não é usado porque o visitante consegue falsificar o começo dele (D31).
+
+### 3. Site (Vercel)
+
+No Vercel, **Add New → Project**, importe este repositório e escolha `web` como **Root Directory**. Em **Environment Variables**, `VITE_API_BASE_URL=https://analise-credito-rural-api.onrender.com`. O `web/vercel.json` faz os links diretos (`/estados/PI`) abrirem o site e define os cabeçalhos de segurança, entre eles a política de conteúdo que só deixa o site falar com a própria origem e com a API.
+
+### 4. Verificação contínua (GitHub Actions)
+
+A cada push e pull request, o GitHub Actions roda os testes do pipeline e da API e, no site, TypeScript, ESLint, Vitest e o build. Com o segredo de repositório `DATABASE_URL_READER` (em **Settings → Secrets and variables → Actions**), os testes das consultas também rodam contra o banco publicado; sem ele, aparecem como pulados. Os testes de navegador (Playwright) precisam da API e do banco, por isso rodam localmente.
 
 ## Plano de execução
 

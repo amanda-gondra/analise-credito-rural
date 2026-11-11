@@ -175,6 +175,8 @@ Implementado em `web/`: React, TypeScript e Tailwind CSS, empacotado pelo Vite c
 
 Os testes do Playwright usam a API local e o banco carregado; o assistente é simulado com uma resposta real gravada, para não gastar cota.
 
+A cada push e pull request, o GitHub Actions (`.github/workflows/ci.yml`) roda o `pytest` e, no site, TypeScript, ESLint, Vitest e o build. O Render só publica um commit da `main` depois que essas verificações passam nele (D32).
+
 ## Segurança
 
 | Risco | Controle |
@@ -182,9 +184,11 @@ Os testes do Playwright usam a API local e o banco carregado; o assistente é si
 | Injeção de SQL | A API não tem SQL próprio: executa as consultas nomeadas de `queries.sql`, com parâmetros vinculados pelo driver; nenhuma concatenação de entrada do usuário |
 | Escrita indevida no banco | A API usa `api_reader`: só `SELECT`, transações somente leitura por padrão |
 | Entrada inválida | Pydantic valida tipos, intervalos (anos carregados) e listas fechadas (UF, atividade, finalidade, região); parâmetro desconhecido é recusado |
-| Consultas caras e abuso | Limite de requisições por cliente às rotas `/api/v1/` (429 com `Retry-After`); tempo máximo de 5 s por consulta e no máximo 10 conexões do `api_reader`; pool de conexões limitado |
+| Consultas caras e abuso | Limite de requisições por visitante às rotas `/api/v1/` (429 com `Retry-After`); tempo máximo de 5 s por consulta e no máximo 10 conexões do `api_reader`; pool de conexões limitado |
+| Visitante falsificado | No Render, o visitante é o endereço do cabeçalho `CF-Connecting-IP`, que o Cloudflare reescreve em todo pedido; o `X-Forwarded-For` nunca é lido, porque o começo dele vem do próprio visitante; endereços IPv6 contam por rede /64 (D31) |
 | Acesso de outros sites | CORS fechado por padrão, aberto só às origens listadas em `ALLOWED_ORIGINS` (`*` é recusado), só `GET` |
-| Credenciais | Variáveis de ambiente; `.env` fora do Git; `.env.example` com valores fictícios; a API lê só a senha do `api_reader` |
+| Credenciais | Variáveis de ambiente; `.env` e `.env.production` fora do Git; `.env.example` com valores fictícios; a API lê só a senha do `api_reader`; no Render e no GitHub, os segredos ficam nos painéis, nunca em `render.yaml` ou no fluxo de CI |
+| Site injetado em outro lugar | Política de conteúdo (`web/vercel.json`): scripts só da própria origem, conexões só com a própria origem e com a API, nenhum site pode exibir este dentro de um quadro |
 | Erros expostos | Formato único de erro com `request_id`; mensagens genéricas, sem SQL nem dados de conexão; detalhes só nos logs, que não registram os parâmetros da requisição |
 
 Não há login: todos os dados são públicos.
@@ -204,21 +208,26 @@ analise-credito-rural/
 │   └── scripts/              # geração do mapa por UF a partir da malha do IBGE
 ├── sql/
 │   ├── schema.sql            # estrutura do banco
+│   ├── roles.sql             # usuários loader e api_reader
 │   └── queries.sql           # consultas analíticas, base das rotas da API
+├── scripts/                  # preparação do banco publicado (Neon)
 ├── docs/
+├── .github/workflows/        # CI (GitHub Actions)
 ├── docker-compose.yml        # PostgreSQL local
+├── render.yaml               # API no Render (Blueprint)
+├── .python-version
 ├── .env.example
 └── README.md
 ```
 
 ## Publicação (planos gratuitos)
 
-Condições verificadas em 25/10/2026; elas mudam com frequência.
+Condições verificadas em 25/10/2026 e de novo em 10/11/2026; elas mudam com frequência. O passo a passo está no README ("Publicação").
 
 | Peça | Serviço | Condições do plano gratuito | Impacto |
 | --- | --- | --- | --- |
-| Banco | Neon | 1 GB por projeto; 100 CU-horas por mês; desliga após 5 min sem uso | Os dados ocupam cerca de 100 MB; a primeira consulta após um período parado é mais lenta |
-| API | Render (web service gratuito) | Desliga após 15 min sem tráfego; volta em cerca de 1 min; 750 h por mês | O primeiro acesso do dia pode levar cerca de um minuto; o site deve mostrar um aviso de carregamento |
+| Banco | Neon, AWS US East 1 (N. Virginia) | 1 GB por projeto; 100 CU-horas por mês; desliga após 5 min sem uso | Os dados ocupam cerca de 100 MB; a primeira consulta após um período parado é mais lenta |
+| API | Render (web service gratuito), região Virginia | Desliga após 15 min sem tráfego; volta em cerca de 1 min; 750 h por mês | O primeiro acesso do dia pode levar cerca de um minuto; o site mostra um aviso de carregamento |
 | Site | Vercel (Hobby) | Gratuito para projetos pessoais | Sem impacto relevante |
 
 O PostgreSQL gratuito do Render foi descartado: expira 30 dias após a criação.
