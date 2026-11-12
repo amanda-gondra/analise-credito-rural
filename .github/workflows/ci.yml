@@ -1,0 +1,66 @@
+# Checks of every push and pull request. Render deploys a commit of main only after these
+# checks pass on it (autoDeployTrigger: checksPass in render.yaml).
+#
+# Database tests: with the repository secret DATABASE_URL_READER (the read-only role of the
+# published database) they run against the real data; without it they are skipped, and
+# the unit tests still run. The browser tests (Playwright) need the API and the loaded
+# database, so they run locally (npm run e2e in web/, see README.md).
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: API and pipeline
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version-file: .python-version
+          cache: pip
+          cache-dependency-path: |
+            api/requirements-dev.txt
+            pipeline/requirements-dev.txt
+      - name: Install dependencies
+        run: pip install -r api/requirements-dev.txt -r pipeline/requirements-dev.txt
+      - name: Tests
+        env:
+          DATABASE_URL_READER: ${{ secrets.DATABASE_URL_READER }}
+        run: python -m pytest -q -rs
+
+  web:
+    name: Site
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
