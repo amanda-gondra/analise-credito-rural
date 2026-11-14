@@ -188,7 +188,7 @@ A cada push e pull request, o GitHub Actions (`.github/workflows/ci.yml`) roda o
 | Visitante falsificado | No Render, o visitante é o endereço do cabeçalho `CF-Connecting-IP`, que o Cloudflare reescreve em todo pedido; o `X-Forwarded-For` nunca é lido, porque o começo dele vem do próprio visitante; endereços IPv6 contam por rede /64 (D31) |
 | Acesso de outros sites | CORS fechado por padrão, aberto só às origens listadas em `ALLOWED_ORIGINS` (`*` é recusado), só `GET` |
 | Credenciais | Variáveis de ambiente; `.env` e `.env.production` fora do Git; `.env.example` com valores fictícios; a API lê só a senha do `api_reader`; no Render e no GitHub, os segredos ficam nos painéis, nunca em `render.yaml` ou no fluxo de CI |
-| Site injetado em outro lugar | Política de conteúdo (`web/vercel.json`): scripts só da própria origem, conexões só com a própria origem e com a API, nenhum site pode exibir este dentro de um quadro |
+| Site injetado em outro lugar | Política de conteúdo (`web/public/_headers`): scripts só da própria origem, conexões só com a própria origem e com a API, nenhum site pode exibir este dentro de um quadro |
 | Erros expostos | Formato único de erro com `request_id`; mensagens genéricas, sem SQL nem dados de conexão; detalhes só nos logs, que não registram os parâmetros da requisição |
 
 Não há login: todos os dados são públicos.
@@ -228,7 +228,7 @@ Condições verificadas em 25/10/2026 e de novo em 10/11/2026; elas mudam com fr
 | --- | --- | --- | --- |
 | Banco | Neon, AWS US East 1 (N. Virginia) | 1 GB por projeto; 100 CU-horas por mês; desliga após 5 min sem uso | Os dados ocupam cerca de 100 MB; a primeira consulta após um período parado é mais lenta |
 | API | Render (web service gratuito), região Virginia | Desliga após 15 min sem tráfego; volta em cerca de 1 min; 750 h por mês | O primeiro acesso do dia pode levar cerca de um minuto; o site mostra um aviso de carregamento |
-| Site | Vercel (Hobby) | Gratuito para projetos pessoais | Sem impacto relevante |
+| Site | Cloudflare Pages | Sites, requisições e banda ilimitados; 500 builds por mês | Sem impacto relevante |
 
 O PostgreSQL gratuito do Render foi descartado: expira 30 dias após a criação.
 
@@ -241,7 +241,7 @@ O PostgreSQL gratuito do Render foi descartado: expira 30 dias após a criação
 | 5 | API FastAPI com as rotas acima + testes | 4 |
 | 6 | Assistente de IA: ferramentas sobre as rotas da API, troca de provedor, limites e conjunto de avaliação (D17, D18) | 5 |
 | 7 | Front-end React com as páginas, o mapa e o Assistente de Dados; rotas da página "Explorar dados" (`/api/v1/credit` e CSV) e contexto da tela no assistente (D20 a D25) | 6 |
-| 8 | Publicação (Neon, Render, Vercel) e CI no GitHub Actions | 7 |
+| 8 | Publicação (Neon, Render, Cloudflare Pages) e CI no GitHub Actions | 7 |
 
 Cada fase é feita um arquivo por vez, com explicação de cada parte.
 

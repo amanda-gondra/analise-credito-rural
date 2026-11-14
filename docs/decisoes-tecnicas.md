@@ -101,7 +101,8 @@ Formato de cada registro: contexto, decisão, alternativas e justificativa. Hip�
 
 ### D15 — Publicação em serviços gratuitos
 
-- **Decisão:** banco no Neon, API no Render (web service gratuito), site no Vercel (Hobby).
+- **Decisão:** banco no Neon, API no Render (web service gratuito), site na Cloudflare Pages.
+- **Mudança (14/11/2026):** o site iria para o Vercel (Hobby), mas o cadastro da conta ficou parado na revisão antifraude do Vercel, sem resposta. A Cloudflare Pages hospeda o mesmo site estático, com CDN global e sem limite de banda no plano gratuito, e aceita os mesmos cabeçalhos de segurança (`web/public/_headers`).
 - **Alternativa descartada:** PostgreSQL gratuito do Render, que expira 30 dias após a criação.
 - **Consequência:** a API desliga após 15 min sem tráfego e leva cerca de 1 min para voltar; o site precisa mostrar um estado de carregamento claro.
 - **Verificado em:** 25/10/2026 e 10/11/2026, nas páginas oficiais de cada serviço (o Neon passou de 0,5 GB para 1 GB por projeto em outubro de 2026). Configuração na D32.
@@ -216,7 +217,7 @@ Formato de cada registro: contexto, decisão, alternativas e justificativa. Hip�
 - **Banco:** PostgreSQL 16, o mesmo do Docker local. `scripts/setup_remote_database.py` cria as tabelas e os usuários no Neon com os mesmos `schema.sql` e `roles.sql`, gera as senhas sem mostrá-las e grava os endereços em `.env.production` (fora do Git). A carga é o mesmo pipeline do banco local. Conexão direta, não o pooler do Neon (PgBouncer em modo transação), que não serve para `COPY` nem para os comandos do `psql`; a API mantém até 5 conexões, abaixo do limite de 10 do `api_reader`.
 - **Ensaio:** antes do Neon, o processo inteiro (script, carga de 2013 a 2025 e IPCA, testes) rodou num PostgreSQL 16 descartável: 279 testes passaram contra ele, incluindo a conferência dos números com os arquivos de origem.
 - **API:** `render.yaml` (Blueprint) com plano gratuito, Python de `.python-version` (3.14), verificação de saúde em `/health` e publicação automática só depois que o GitHub Actions passa no commit (`autoDeployTrigger: checksPass`). Segredos (`DATABASE_URL_READER`, `GEMINI_API_KEY`) são pedidos pelo painel do Render e nunca aparecem no arquivo. Mudanças só no site ou nos testes não publicam a API (`buildFilter`).
-- **Site:** `web/vercel.json` devolve `index.html` para qualquer endereço que não seja arquivo (P16) e envia cabeçalhos de segurança: política de conteúdo (scripts só da própria origem; conexões só com a própria origem e com a API; nenhum quadro), `nosniff`, política de referência e de permissões. Os arquivos de `/assets/` têm nome com hash e ficam em cache por um ano.
+- **Site:** na Cloudflare Pages, um site sem `404.html` é tratado como aplicação de página única, e qualquer endereço que não seja arquivo recebe o `index.html` (P16). `web/public/_headers` envia os cabeçalhos de segurança: política de conteúdo (scripts só da própria origem; conexões só com a própria origem e com a API; nenhum quadro), `nosniff`, política de referência e de permissões. Os arquivos de `/assets/` têm nome com hash e ficam em cache por um ano.
 - **CI:** `.github/workflows/ci.yml` roda o `pytest` e, no site, TypeScript, ESLint, Vitest e build, com permissão só de leitura no repositório. Com o segredo `DATABASE_URL_READER`, os testes das consultas rodam contra o banco publicado. Os testes de navegador continuam locais: precisam da API e do banco carregados.
 
 ## Pendências
@@ -238,4 +239,4 @@ Formato de cada registro: contexto, decisão, alternativas e justificativa. Hip�
 | P13 | Limite de 60 pedidos por minuto por visitante | **Resolvida no código** (D31): visitante pelo `CF-Connecting-IP`, 120 pedidos por minuto no Render; falta conferir no Render publicado | — |
 | P14 | Assistente misturando valores nominais e corrigidos numa mesma resposta e calculando participações | **Resolvida** (D27) | — |
 | P15 | Participação do ranking de um único ano calculada sobre valores corrigidos | **Resolvida** (D26) | — |
-| P16 | Links diretos para páginas do site publicado (`/estados/PI`) | **Resolvida no código** (D32): `web/vercel.json`; falta conferir no Vercel publicado | — |
+| P16 | Links diretos para páginas do site publicado (`/estados/PI`) | **Resolvida** (D32): a Cloudflare Pages devolve o `index.html` por padrão; falta conferir no site publicado | — |

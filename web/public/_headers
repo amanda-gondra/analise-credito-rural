@@ -1,0 +1,13 @@
+# Security headers of the published site (Cloudflare Pages reads this file from the build
+# output; Vite copies web/public/ there). Decision D32.
+# connect-src lists the API: the site talks only to its own origin and to it.
+
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://analise-credito-rural-api.onrender.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
+
+# File names under /assets/ carry a content hash, so they can be cached for a year.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable

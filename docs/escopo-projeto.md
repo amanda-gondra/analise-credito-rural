@@ -51,7 +51,7 @@ Entra:
 5. API somente leitura em FastAPI.
 6. Site em React com visão geral do Brasil, página por estado, comparação, MATOPIBA, exploração dos dados com download em CSV e página sobre os dados.
 7. Testes do pipeline, da API e do front-end, executados no GitHub Actions.
-8. Publicação gratuita: banco no Neon, API no Render, site no Vercel.
+8. Publicação gratuita: banco no Neon, API no Render, site na Cloudflare Pages.
 9. README com instruções de execução, link do site e descobertas validadas.
 
 **Período da série principal:** 2017 a 2025, em ano civil. 2013–2016 têm quebras de classificação e de cobertura e ficam fora do comparativo principal; 2026 só aparece como dado parcial. Justificativa na D9 em [decisoes-tecnicas.md](decisoes-tecnicas.md).
