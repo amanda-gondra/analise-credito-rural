@@ -39,8 +39,20 @@ WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'api_reader')
 \gexec
 
 -- Keep the passwords in sync with .env when the script runs again.
-ALTER ROLE loader     WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE PASSWORD :'loader_password';
-ALTER ROLE api_reader WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE PASSWORD :'api_reader_password';
+ALTER ROLE loader     WITH LOGIN NOCREATEDB NOCREATEROLE PASSWORD :'loader_password';
+ALTER ROLE api_reader WITH LOGIN NOCREATEDB NOCREATEROLE PASSWORD :'api_reader_password';
+
+-- Only a superuser may name SUPERUSER, REPLICATION or BYPASSRLS in ALTER ROLE, even to remove
+-- them, and on managed services (Neon) the database owner is not one. New roles never have these
+-- attributes, so check that they still do not instead of setting them.
+SELECT count(*) > 0 AS privileged_role
+FROM pg_roles
+WHERE rolname IN ('loader', 'api_reader')
+  AND (rolsuper OR rolreplication OR rolbypassrls)
+\gset
+\if :privileged_role
+    DO $$ BEGIN RAISE EXCEPTION 'loader and api_reader must not be superuser, replication or bypassrls roles'; END $$;
+\endif
 
 -- Session defaults.
 ALTER ROLE loader     SET search_path = rural_credit;

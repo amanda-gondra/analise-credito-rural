@@ -2,7 +2,9 @@
 
 Aplicação web para consultar o crédito rural no Brasil com dados oficiais do Banco Central: quanto é concedido, para onde vai e como mudou ao longo dos anos. Qualquer pessoa escolhe período, estado, atividade e finalidade e vê os números, os gráficos e a fonte.
 
-> **Status: Fase 7 concluída — site pronto, rodando localmente.** Os dados de 2013 a 2025 são baixados do Banco Central, validados e carregados no PostgreSQL com reconciliação até o centavo; o IPCA do IBGE permite mostrar valores corrigidos; as 11 perguntas têm consultas SQL testadas contra o banco, uma API somente leitura que as publica, um assistente de IA avaliado com 38 perguntas e um site em React, testado do celular de 320 px à tela de 1920 px. A publicação (fase 8) ainda não foi feita.
+> **Acesse:** [analise-credito-rural.pages.dev](https://analise-credito-rural.pages.dev) · API: [documentação interativa](https://analise-credito-rural-api.onrender.com/docs)
+>
+> **Status: as 8 fases concluídas — no ar.** Os dados de 2013 a 2025 são baixados do Banco Central, validados e carregados no PostgreSQL com reconciliação até o centavo; o IPCA do IBGE permite mostrar valores corrigidos; as 11 perguntas têm consultas SQL testadas contra o banco, uma API somente leitura que as publica, um assistente de IA avaliado com 38 perguntas e um site em React, testado do celular de 320 px à tela de 1920 px. O site está na Cloudflare Pages, a API no Render e o banco no Neon, todos em planos gratuitos: depois de um tempo sem acessos, a primeira página leva cerca de um minuto para carregar.
 
 ## O que o site oferece
 
@@ -194,7 +196,7 @@ No Neon, crie o projeto em **AWS US East 1 (N. Virginia)** com PostgreSQL 16. Em
 
 A rede do computador precisa permitir conexões de saída na porta 5432, a do PostgreSQL. Algumas redes (de faculdade, de empresa, alguns roteadores) só liberam as portas de sites; nelas a conexão é recusada, e a saída é rodar estes passos em outra rede, como o roteador do celular.
 
-O script cria as tabelas (`sql/schema.sql`) e os usuários `loader` e `api_reader` (`sql/roles.sql`) no Neon, gera as senhas deles sem mostrá-las e grava em `.env.production` os endereços `DATABASE_URL` (carga) e `DATABASE_URL_READER` (leitura, para o Render). Pode ser executado de novo: mantém as senhas e não recria as tabelas. A carga usa o mesmo pipeline do banco local, só que apontado para o Neon nesta sessão do terminal:
+O script cria as tabelas (`sql/schema.sql`) e os usuários `loader` e `api_reader` (`sql/roles.sql`) no Neon, gera as senhas deles sem mostrá-las e grava em `.env.production` os endereços `DATABASE_URL` (carga) e `DATABASE_URL_READER` (leitura, para o Render). Pode ser executado de novo: mantém as senhas e não recria as tabelas. No Neon, o dono do banco não é superusuário; o `roles.sql` só usa comandos que esse dono pode executar e confere que `loader` e `api_reader` não têm privilégios de superusuário. A carga usa o mesmo pipeline do banco local, só que apontado para o Neon nesta sessão do terminal:
 
 ```powershell
 Get-Content .env.production | Where-Object { $_ -match '^DATABASE_URL(_READER)?=' } | ForEach-Object { $k, $v = $_ -split '=', 2; Set-Item "env:$k" $v }
@@ -212,7 +214,7 @@ O limite por visitante usa o cabeçalho `CF-Connecting-IP`, que o Cloudflare, na
 
 ### 3. Site (Cloudflare Pages)
 
-Na Cloudflare, **Workers & Pages → Create → Pages → Connect to Git**, escolha este repositório e use:
+Na Cloudflare, abra **Workers & Pages → Create application**, clique no link **Continue to Pages**, no fim da página, e depois em **Import an existing Git repository**. Os outros botões dessa página criam um Worker, configurado para rodar `npx wrangler deploy` na raiz do repositório, sem montar o site da pasta `web`. Escolha este repositório e use:
 
 | Campo | Valor |
 | --- | --- |
@@ -239,7 +241,7 @@ A cada push e pull request, o GitHub Actions roda os testes do pipeline e da API
 5. **API** FastAPI com testes — concluída
 6. **Assistente de IA** com ferramentas fechadas e avaliação — concluída
 7. **Site** React com o Assistente de Dados — concluída
-8. **Publicação** e integração contínua
+8. **Publicação** e integração contínua — concluída
 
 ## Documentação
 
