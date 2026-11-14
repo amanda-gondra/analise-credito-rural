@@ -232,6 +232,8 @@ Condições verificadas em 25/10/2026 e de novo em 10/11/2026; elas mudam com fr
 
 O PostgreSQL gratuito do Render foi descartado: expira 30 dias após a criação.
 
+No ar desde 14/11/2026: site em https://analise-credito-rural.pages.dev e API em https://analise-credito-rural-api.onrender.com (documentação em `/docs`).
+
 ## Ordem de construção
 
 | Fase | Entrega | Depende de |
