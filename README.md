@@ -56,7 +56,7 @@ Arquivos do BCB → pipeline (Python) → PostgreSQL → API (FastAPI) → site 
 | API | FastAPI, Pydantic, SQLAlchemy Core — `api/` | **Pronto e testado** |
 | Assistente | Modelo de linguagem em plano gratuito (Gemini, com Groq e Cloudflare de reserva) e ferramentas sobre as consultas — `api/app/assistant/` | **Pronto e avaliado** |
 | Site | React, Vite, TypeScript, Tailwind CSS, Vitest, Playwright — `web/` | **Pronto e testado** |
-| Publicação | Neon (banco), Render (API), Vercel (site), GitHub Actions | Em andamento (fase 8) |
+| Publicação | Neon (banco), Render (API), Cloudflare Pages (site), GitHub Actions | Em andamento (fase 8) |
 
 Detalhes, rotas da API e segurança em [docs/arquitetura-aplicacao.md](docs/arquitetura-aplicacao.md).
 
@@ -177,10 +177,10 @@ Na 1ª rodada o modelo cortou uma casa decimal (66,5% em vez de 66,6%), somou po
 | --- | --- | --- |
 | Banco | Neon, AWS US East (N. Virginia), PostgreSQL 16 | `scripts/setup_remote_database.py` e o pipeline |
 | API | Render, região Virginia | `render.yaml` (Blueprint) e `.python-version` |
-| Site | Vercel | `web/vercel.json`: rotas do site e cabeçalhos de segurança |
+| Site | Cloudflare Pages | `web/public/_headers`: cabeçalhos de segurança |
 | Verificação | GitHub Actions | `.github/workflows/ci.yml`: testes da API, do pipeline e do site a cada push |
 
-Banco e API ficam na mesma região porque cada página faz várias consultas; o Neon tem São Paulo, mas o Render não. O Render só publica um commit da `main` depois que o GitHub Actions passa nele. Os nomes `analise-credito-rural` (Vercel) e `analise-credito-rural-api` (Render) aparecem em `render.yaml` e em `web/vercel.json`; outro nome exige trocar os dois arquivos. Decisões em D15, D31 e D32.
+Banco e API ficam na mesma região porque cada página faz várias consultas; o Neon tem São Paulo, mas o Render não. O Render só publica um commit da `main` depois que o GitHub Actions passa nele. Os nomes `analise-credito-rural` (Cloudflare Pages) e `analise-credito-rural-api` (Render) aparecem em `render.yaml` e em `web/public/_headers`; outro nome exige trocar os dois arquivos. Decisões em D15, D31 e D32.
 
 As senhas e endereços do banco publicado ficam em `.env.production`, fora do Git, e nos painéis do Render e do GitHub. Nenhum segredo fica no código.
 
@@ -191,6 +191,8 @@ No Neon, crie o projeto em **AWS US East 1 (N. Virginia)** com PostgreSQL 16. Em
 ```powershell
 .venv\Scripts\python scripts\setup_remote_database.py
 ```
+
+A rede do computador precisa permitir conexões de saída na porta 5432, a do PostgreSQL. Algumas redes (de faculdade, de empresa, alguns roteadores) só liberam as portas de sites; nelas a conexão é recusada, e a saída é rodar estes passos em outra rede, como o roteador do celular.
 
 O script cria as tabelas (`sql/schema.sql`) e os usuários `loader` e `api_reader` (`sql/roles.sql`) no Neon, gera as senhas deles sem mostrá-las e grava em `.env.production` os endereços `DATABASE_URL` (carga) e `DATABASE_URL_READER` (leitura, para o Render). Pode ser executado de novo: mantém as senhas e não recria as tabelas. A carga usa o mesmo pipeline do banco local, só que apontado para o Neon nesta sessão do terminal:
 
@@ -208,9 +210,21 @@ No Render, **New → Blueprint**, escolha este repositório e confirme o `render
 
 O limite por visitante usa o cabeçalho `CF-Connecting-IP`, que o Cloudflare, na frente do Render, escreve em todo pedido; o `X-Forwarded-For` não é usado porque o visitante consegue falsificar o começo dele (D31).
 
-### 3. Site (Vercel)
+### 3. Site (Cloudflare Pages)
 
-No Vercel, **Add New → Project**, importe este repositório e escolha `web` como **Root Directory**. Em **Environment Variables**, `VITE_API_BASE_URL=https://analise-credito-rural-api.onrender.com`. O `web/vercel.json` faz os links diretos (`/estados/PI`) abrirem o site e define os cabeçalhos de segurança, entre eles a política de conteúdo que só deixa o site falar com a própria origem e com a API.
+Na Cloudflare, **Workers & Pages → Create → Pages → Connect to Git**, escolha este repositório e use:
+
+| Campo | Valor |
+| --- | --- |
+| Project name | `analise-credito-rural` |
+| Production branch | `main` |
+| Framework preset | React (Vite) |
+| Build command | `npm run build` |
+| Build output directory | `dist` |
+| Root directory | `web` |
+| Environment variable | `VITE_API_BASE_URL=https://analise-credito-rural-api.onrender.com` |
+
+O site fica em `https://analise-credito-rural.pages.dev`, a origem liberada no CORS da API (`ALLOWED_ORIGINS` em `render.yaml`). A versão do Node vem de `web/.node-version`. Os links diretos (`/estados/PI`) funcionam sem configuração: sem um `404.html`, a Cloudflare trata o site como aplicação de página única e devolve o `index.html`. O `web/public/_headers` define os cabeçalhos de segurança, entre eles a política de conteúdo que só deixa o site falar com a própria origem e com a API.
 
 ### 4. Verificação contínua (GitHub Actions)
 

@@ -32,8 +32,9 @@ services:
         sync: false
       - key: GEMINI_API_KEY
         sync: false
+      # The site on Cloudflare Pages (web/public/_headers).
       - key: ALLOWED_ORIGINS
-        value: https://analise-credito-rural.vercel.app
+        value: https://analise-credito-rural.pages.dev
       # Cloudflare, in front of Render, writes the visitor's address here on every request.
       - key: CLIENT_IP_HEADER
         value: CF-Connecting-IP
